@@ -62,10 +62,20 @@
         </div>
         <!-- OVERALL STATISTICS -->
         <div class="col-md-6">
-          <form action="/requestfaucet/" method="get">
+          <form action="/requestfaucet" method="post">
             <input style="color:black" type="text" name="address" placeholder="Address">
             <input style="color:black" type="submit" value="Send">
           </form>
+          {{if .Error}}
+          <div style="color:red">
+            {{.Error}}
+          </div>
+          {{end}}
+          {{if .Success}}
+          <div style="color:green">
+            {{.Success}}
+          </div>
+          {{end}}
         </div>
       </div>
     </div> <!-- /container -->

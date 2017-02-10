@@ -25,6 +25,7 @@ var dcrwPass = "PASSWORD"
 
 // Daemon Params to use
 var activeNetParams = &chaincfg.TestNetParams
+var dcrwClient *dcrrpcclient.Client
 
 // Webserver settings
 var listeningPort = ":8001"
@@ -34,6 +35,7 @@ type testnetFaucetInfo struct {
 	BlockHeight int64
 	Balance     int64
 	Error       error
+	Success     string
 }
 
 var funcMap = template.FuncMap{
@@ -44,45 +46,42 @@ func minus(a, b int) int {
 	return a - b
 }
 
-func demoPage(w http.ResponseWriter, r *http.Request) {
-
-	fp := filepath.Join("public/views", "design_sketch.html")
-	tmpl, err := template.New("home").Funcs(funcMap).ParseFiles(fp)
-	if err != nil {
-		panic(err)
-	}
-	testnetFaucetInformation := &testnetFaucetInfo{}
-	err = tmpl.Execute(w, testnetFaucetInformation)
-	if err != nil {
-		panic(err)
-	}
-
-}
 func requestFunds(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.Form.Get("address"))
+	fmt.Println("method:", r.Method) //get request method
 	fp := filepath.Join("public/views", "design_sketch.html")
-	tmpl, err := template.New("home").Funcs(funcMap).ParseFiles(fp)
+	tmpl, err := template.New("home").ParseFiles(fp)
 	if err != nil {
 		panic(err)
 	}
-	testnetFaucetInformation := &testnetFaucetInfo{}
-	testnetFaucetInformation.Error = fmt.Errorf("new error")
-	err = tmpl.Execute(w, testnetFaucetInformation)
-	if err != nil {
-		panic(err)
+	if r.Method == "GET" {
+		err = tmpl.Execute(w, nil)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		testnetFaucetInformation := &testnetFaucetInfo{}
+		r.ParseForm()
+		fmt.Println("address:", r.Form["address"])
+		addr, err := dcrutil.DecodeAddress(r.Form["address"][0], activeNetParams)
+		if err != nil {
+			testnetFaucetInformation.Error = err
+		} else {
+			resp, err := dcrwClient.SendToAddress(addr, 10000000000)
+			if err != nil {
+				testnetFaucetInformation.Error = err
+
+			} else {
+				testnetFaucetInformation.Success = fmt.Sprintf("Success! Txid: %s", resp.String())
+			}
+		}
+		err = tmpl.Execute(w, testnetFaucetInformation)
+		if err != nil {
+			panic(err)
+		}
 	}
-
 }
-func updatetestnetInformation(dcrdClient *dcrrpcclient.Client) {
-	fmt.Println("updating testnet information")
-}
-
-var mux map[string]func(http.ResponseWriter, *http.Request)
 
 func main() {
-	mux = make(map[string]func(http.ResponseWriter, *http.Request))
-	mux["/"] = demoPage
-
 	quit := make(chan struct{})
 
 	var dcrwCerts []byte
@@ -103,21 +102,12 @@ func main() {
 		Certificates: dcrwCerts,
 		DisableTLS:   false,
 	}
-	dcrwClient, err := dcrrpcclient.New(connCfgDaemon, nil)
+	dcrwClient, err = dcrrpcclient.New(connCfgDaemon, nil)
 	if err != nil {
 		fmt.Printf("Failed to start dcrd rpcclient: %s\n", err.Error())
 		os.Exit(1)
 	}
-	addr, err := dcrutil.DecodeAddress("TsWprM9ywF9GaiBidtcRLx6oZfCeCGknRZV", activeNetParams)
-	if err != nil {
-		fmt.Println(err)
-	}
-	resp, err := dcrwClient.SendToAddress(addr, 1000000)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("txid:", resp)
-	updatetestnetInformation(dcrwClient)
+
 	go func() {
 		for {
 			select {
@@ -130,12 +120,11 @@ func main() {
 			}
 		}
 	}()
-	http.HandleFunc("/", demoPage)
 	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("public/js/"))))
 	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("public/css/"))))
 	http.Handle("/fonts/", http.StripPrefix("/fonts/", http.FileServer(http.Dir("public/fonts/"))))
 	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("public/images/"))))
-	http.HandleFunc("/requestfaucet/?address=", requestFunds)
+	http.HandleFunc("/", requestFunds)
 	err = http.ListenAndServe(listeningPort, nil)
 	if err != nil {
 		fmt.Printf("Failed to bind http server: %s\n", err.Error())
