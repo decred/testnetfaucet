@@ -17,8 +17,8 @@ import (
 )
 
 // Settings for daemon
-var dcrwCertPath = ("/home/user/.dcrd/rpc.cert")
-var dcrwServer = "127.0.0.1:19111"
+var dcrwCertPath = ("/home/user/.dcrwallet/rpc.cert")
+var dcrwServer = "127.0.0.1:19110"
 var dcrwUser = "USER"
 var dcrwPass = "PASSWORD"
 
@@ -34,7 +34,7 @@ type testnetFaucetInfo struct {
 	Balance     int64
 }
 
-var testnetInformation = &testnetInfo{}
+var testnetInformation = &testnetFaucetInfo{}
 
 var funcMap = template.FuncMap{
 	"minus": minus,
@@ -67,7 +67,6 @@ func main() {
 	mux = make(map[string]func(http.ResponseWriter, *http.Request))
 	mux["/"] = demoPage
 
-	connectChan := make(chan int64, 100)
 	quit := make(chan struct{})
 
 	var dcrwCerts []byte
