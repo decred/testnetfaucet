@@ -33,9 +33,8 @@ var listeningPort = ":8001"
 type testnetFaucetInfo struct {
 	BlockHeight int64
 	Balance     int64
+	Error       error
 }
-
-var testnetInformation = &testnetFaucetInfo{}
 
 var funcMap = template.FuncMap{
 	"minus": minus,
@@ -52,7 +51,23 @@ func demoPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	err = tmpl.Execute(w, testnetInformation)
+	testnetFaucetInformation := &testnetFaucetInfo{}
+	err = tmpl.Execute(w, testnetFaucetInformation)
+	if err != nil {
+		panic(err)
+	}
+
+}
+func requestFunds(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r.Form.Get("address"))
+	fp := filepath.Join("public/views", "design_sketch.html")
+	tmpl, err := template.New("home").Funcs(funcMap).ParseFiles(fp)
+	if err != nil {
+		panic(err)
+	}
+	testnetFaucetInformation := &testnetFaucetInfo{}
+	testnetFaucetInformation.Error = fmt.Errorf("new error")
+	err = tmpl.Execute(w, testnetFaucetInformation)
 	if err != nil {
 		panic(err)
 	}
@@ -120,6 +135,7 @@ func main() {
 	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("public/css/"))))
 	http.Handle("/fonts/", http.StripPrefix("/fonts/", http.FileServer(http.Dir("public/fonts/"))))
 	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("public/images/"))))
+	http.HandleFunc("/requestfaucet/?address=", requestFunds)
 	err = http.ListenAndServe(listeningPort, nil)
 	if err != nil {
 		fmt.Printf("Failed to bind http server: %s\n", err.Error())

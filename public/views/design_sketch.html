@@ -11,8 +11,8 @@
     <meta name="author" content="Decred Developer">
     <link rel="icon" href="favicon.ico">
     <title>Hardfork Demo</title>
-    <link href="css/bootstrap.min.css" rel="stylesheet">
-    <link href="css/main.css" rel="stylesheet">
+    <link href="/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/main.css" rel="stylesheet">
     <!--  Custom favicon  -->
     <link rel="apple-touch-icon" sizes="180x180" href="./content/images/favicon/apple-touch-icon.png?v=fi5jKKtbwv">
     <link rel="icon" type="image/png" href="./content/images/favicon/favicon-32x32.png?v=fi5jKKtbwv" sizes="32x32">
@@ -27,7 +27,7 @@
       <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
       <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
     <![endif]-->
-    <script src="js/Chart.min.js"></script>
+    <script src="/js/Chart.min.js"></script>
   </head>
   <body>
     <!-- Fixed navbar -->
@@ -42,7 +42,7 @@
           </button>
           <a class="navbar-brand" href="#">
             <svg class="svg-logo">
-              <use xlink:href="images/sprites.svg#svg-decred-logo" />
+              <use xlink:href="/images/sprites.svg#svg-decred-logo" />
             </svg>
           </a>
         </div>
@@ -62,6 +62,10 @@
         </div>
         <!-- OVERALL STATISTICS -->
         <div class="col-md-6">
+          <form action="/requestfaucet/" method="get">
+            <input style="color:black" type="text" name="address" placeholder="Address">
+            <input style="color:black" type="submit" value="Send">
+          </form>
         </div>
       </div>
     </div> <!-- /container -->
