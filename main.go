@@ -14,6 +14,7 @@ import (
 
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrrpcclient"
+	"github.com/decred/dcrutil"
 )
 
 // Settings for daemon
@@ -92,7 +93,15 @@ func main() {
 		fmt.Printf("Failed to start dcrd rpcclient: %s\n", err.Error())
 		os.Exit(1)
 	}
-
+	addr, err := dcrutil.DecodeAddress("TsWprM9ywF9GaiBidtcRLx6oZfCeCGknRZV", activeNetParams)
+	if err != nil {
+		fmt.Println(err)
+	}
+	resp, err := dcrwClient.SendToAddress(addr, 1000000)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("txid:", resp)
 	updatetestnetInformation(dcrwClient)
 	go func() {
 		for {
