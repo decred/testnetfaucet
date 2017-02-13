@@ -98,7 +98,6 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		r.ParseForm()
-		fmt.Println("address:", r.Form["address"])
 		addr, err := dcrutil.DecodeAddress(r.Form["address"][0], activeNetParams)
 		if err != nil {
 			testnetFaucetInformation.Error = err
