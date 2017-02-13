@@ -55,7 +55,6 @@ func minus(a, b int) int {
 }
 
 func requestFunds(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("method:", r.Method) //get request method
 	fp := filepath.Join("public/views", "design_sketch.html")
 	tmpl, err := template.New("home").ParseFiles(fp)
 	if err != nil {
@@ -70,7 +69,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		testnetFaucetInformation := &testnetFaucetInfo{}
 		incomingIPaddress := getClientIP(r)
 		hostIP, _, err := net.SplitHostPort(incomingIPaddress)
-		if err != nil {
+		if err != nil && incomingIPaddress != "127.0.0.1" {
 			err = fmt.Errorf("Error when parsing incoming IP address, Please try again")
 			testnetFaucetInformation.Error = err
 			err = tmpl.Execute(w, testnetFaucetInformation)
@@ -78,6 +77,8 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 				panic(err)
 			}
 			return
+		} else if incomingIPaddress == "127.0.0.1" {
+			hostIP = "127.0.0.1"
 		}
 		timeOut, ok := requestedIps[hostIP]
 		if !ok {
@@ -87,8 +88,8 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 			// ten minutes later than don't allow request
 			if time.Now().Sub(timeOut) < ipTimeoutValue {
 				err = fmt.Errorf("To ensure everyone has equal access to testnet "+
-					"coins, we have a timeout per IP address of %s"+
-					" please try again shortly", ipTimeoutValue.String())
+					"coins, we have a timeout per IP address of %s."+
+					" Please try again shortly", ipTimeoutValue.String())
 				testnetFaucetInformation.Error = err
 				err = tmpl.Execute(w, testnetFaucetInformation)
 				if err != nil {
