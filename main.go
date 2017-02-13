@@ -71,11 +71,13 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		incomingIPaddress := getClientIP(r)
 		hostIP, _, err := net.SplitHostPort(incomingIPaddress)
 		if err != nil {
-			fmt.Println("Error when parsing incoming IP address:", err)
-			// Handle loopback slightly differently
-			if hostIP != "127.0.0.1" {
-				return
+			err = fmt.Errorf("Error when parsing incoming IP address, Please try again")
+			testnetFaucetInformation.Error = err
+			err = tmpl.Execute(w, testnetFaucetInformation)
+			if err != nil {
+				panic(err)
 			}
+			return
 		}
 		timeOut, ok := requestedIps[hostIP]
 		if !ok {
