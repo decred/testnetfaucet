@@ -107,7 +107,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 				testnetFaucetInformation.Error = err
 
 			} else {
-				testnetFaucetInformation.Success = fmt.Sprintf("Success! Txid: %s", resp.String())
+				testnetFaucetInformation.Success = resp.String()
 			}
 		}
 		err = tmpl.Execute(w, testnetFaucetInformation)
