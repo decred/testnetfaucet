@@ -11,6 +11,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
+
+	"net"
 
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrrpcclient"
@@ -26,6 +30,10 @@ var dcrwPass = "PASSWORD"
 // Daemon Params to use
 var activeNetParams = &chaincfg.TestNetParams
 var dcrwClient *dcrrpcclient.Client
+
+// Map of received IP requests for funds.
+var requestedIps map[string]time.Time
+var ipTimeoutValue = time.Duration(10 * time.Minute) // 10 minutes
 
 // Webserver settings
 var listeningPort = ":8001"
@@ -60,6 +68,33 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		testnetFaucetInformation := &testnetFaucetInfo{}
+		incomingIPaddress := getClientIP(r)
+		hostIP, _, err := net.SplitHostPort(incomingIPaddress)
+		if err != nil {
+			fmt.Println("Error when parsing incoming IP address:", err)
+			// Handle loopback slightly differently
+			if hostIP != "127.0.0.1" {
+				return
+			}
+		}
+		timeOut, ok := requestedIps[hostIP]
+		if !ok {
+			requestedIps[hostIP] = time.Now()
+		} else {
+			// If time saved in the requestedIps map is less than
+			// ten minutes later than don't allow request
+			if time.Now().Sub(timeOut) < ipTimeoutValue {
+				err = fmt.Errorf("To ensure everyone has equal access to testnet "+
+					"coins, we have a timeout per IP address of %s"+
+					" please try again shortly", ipTimeoutValue.String())
+				testnetFaucetInformation.Error = err
+				err = tmpl.Execute(w, testnetFaucetInformation)
+				if err != nil {
+					panic(err)
+				}
+				return
+			}
+		}
 		r.ParseForm()
 		fmt.Println("address:", r.Form["address"])
 		addr, err := dcrutil.DecodeAddress(r.Form["address"][0], activeNetParams)
@@ -84,6 +119,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 func main() {
 	quit := make(chan struct{})
 
+	requestedIps = make(map[string]time.Time)
 	var dcrwCerts []byte
 	dcrwCerts, err := ioutil.ReadFile(dcrwCertPath)
 	if err != nil {
@@ -129,4 +165,28 @@ func main() {
 	if err != nil {
 		fmt.Printf("Failed to bind http server: %s\n", err.Error())
 	}
+}
+
+// Get the client's real IP address using the X-Real-IP header, or if that is
+// empty, http.Request.RemoteAddr. See the sample nginx.conf for using the
+// real_ip module to correctly set the X-Real-IP header.
+func getClientIP(r *http.Request) string {
+	getHost := func(ip string) string {
+		if strings.Contains(ip, ":") {
+			parts := strings.Split(ip, ":")
+			return parts[0]
+		}
+		return ip
+	}
+
+	realIP := r.Header.Get("X-Real-IP")
+	realIP = getHost(realIP)
+
+	if realIP == "" {
+		fmt.Println(`"X-Real-IP" header invalid, using RemoteAddr instead`)
+		// If this somehow errors, just go with empty
+		realIP = getHost(r.RemoteAddr)
+	}
+
+	return realIP
 }
