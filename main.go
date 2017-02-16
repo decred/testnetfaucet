@@ -98,16 +98,21 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		r.ParseForm()
-		addr, err := dcrutil.DecodeAddress(r.Form["address"][0], activeNetParams)
-		if err != nil {
-			testnetFaucetInformation.Error = err
+		address := r.Form["address"]
+		if len(address) == 0 {
+			testnetFaucetInformation.Error = fmt.Errorf("Invalid address entry, please try again.")
 		} else {
-			resp, err := dcrwClient.SendToAddress(addr, 10000000000)
+			addr, err := dcrutil.DecodeAddress(address[0], activeNetParams)
 			if err != nil {
 				testnetFaucetInformation.Error = err
-
 			} else {
-				testnetFaucetInformation.Success = resp.String()
+				resp, err := dcrwClient.SendToAddress(addr, 10000000000)
+				if err != nil {
+					testnetFaucetInformation.Error = err
+
+				} else {
+					testnetFaucetInformation.Success = resp.String()
+				}
 			}
 		}
 		err = tmpl.Execute(w, testnetFaucetInformation)
