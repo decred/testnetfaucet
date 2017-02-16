@@ -66,18 +66,9 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		testnetFaucetInformation := &testnetFaucetInfo{}
-		incomingIPaddress := getClientIP(r)
-		hostIP, _, err := net.SplitHostPort(incomingIPaddress)
-		if err != nil && incomingIPaddress != "127.0.0.1" {
-			err = fmt.Errorf("Error when parsing incoming IP address, Please try again")
-			testnetFaucetInformation.Error = err
-			err = tmpl.Execute(w, testnetFaucetInformation)
-			if err != nil {
-				panic(err)
-			}
-			return
-		} else if incomingIPaddress == "127.0.0.1" {
-			hostIP = "127.0.0.1"
+		hostIP, err := getClientIP(r)
+		if err != nil {
+			panic(err)
 		}
 		timeOut, ok := requestedIps[hostIP]
 		if !ok {
@@ -98,7 +89,8 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		r.ParseForm()
-		addr, err := dcrutil.DecodeAddress(r.Form["address"][0], activeNetParams)
+		address := r.FormValue("address")
+		addr, err := dcrutil.DecodeAddress(address, activeNetParams)
 		if err != nil {
 			testnetFaucetInformation.Error = err
 		} else {
@@ -171,14 +163,16 @@ func main() {
 // Get the client's real IP address using the X-Real-IP header, or if that is
 // empty, http.Request.RemoteAddr. See the sample nginx.conf for using the
 // real_ip module to correctly set the X-Real-IP header.
-func getClientIP(r *http.Request) string {
+func getClientIP(r *http.Request) (string, error) {
 	xRealIP := r.Header.Get("X-Real-IP")
-	realIPHost, _, err := net.SplitHostPort(xRealIP)
-	if err != nil {
+	if len(xRealIP) == 0 {
 		fmt.Println(`"X-Real-IP" header invalid, using RemoteAddr instead`)
-		// If this somehow errors, just go with empty
-		return r.RemoteAddr
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			return "", err
+		}
+		return host, nil
 	}
 
-	return realIPHost
+	return xRealIP, nil
 }
