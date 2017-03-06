@@ -32,7 +32,7 @@ var dcrwClient *dcrrpcclient.Client
 
 // Map of received IP requests for funds.
 var requestedIps map[string]time.Time
-var ipTimeoutValue = time.Duration(10 * time.Minute) // 10 minutes
+var ipTimeoutValue = 10 * time.Minute // 10 minutes
 
 // Webserver settings
 var listeningPort = ":8001"
@@ -76,7 +76,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		} else {
 			// If time saved in the requestedIps map is less than
 			// ten minutes later than don't allow request
-			if time.Now().Sub(timeOut) < ipTimeoutValue {
+			if time.Since(timeOut) < ipTimeoutValue {
 				err = fmt.Errorf("To ensure everyone has equal access to testnet "+
 					"coins, we have a timeout per IP address of %s."+
 					" Please try again shortly", ipTimeoutValue.String())
@@ -138,16 +138,10 @@ func main() {
 	}
 
 	go func() {
-		for {
-			select {
-			case <-quit:
-				close(quit)
-				dcrwClient.Disconnect()
-				fmt.Printf("\nClosing testnet demo.\n")
-				os.Exit(1)
-				break
-			}
-		}
+		<-quit
+		fmt.Printf("\nClosing testnet demo.\n")
+		dcrwClient.Disconnect()
+		os.Exit(1)
 	}()
 	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("public/js/"))))
 	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("public/css/"))))
