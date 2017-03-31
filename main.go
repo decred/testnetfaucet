@@ -27,7 +27,7 @@ var dcrwUser = "USER"
 var dcrwPass = "PASSWORD"
 
 // Daemon Params to use
-var activeNetParams = &chaincfg.TestNetParams
+var activeNetParams = &chaincfg.TestNet2Params
 var dcrwClient *dcrrpcclient.Client
 
 // Map of received IP requests for funds.
