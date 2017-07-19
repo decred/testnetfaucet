@@ -90,7 +90,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		}
 		r.ParseForm()
 		address := r.FormValue("address")
-		addr, err := dcrutil.DecodeAddress(address, activeNetParams)
+		addr, err := dcrutil.DecodeAddress(address)
 		if err != nil {
 			testnetFaucetInformation.Error = err
 		} else {

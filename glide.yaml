@@ -1,7 +1,13 @@
 package: github.com/decred/testnetfaucet
 import:
 - package: github.com/decred/dcrd
+  version: decodeaddress
+  repo: https://github.com/dnldd/dcrd.git
   subpackages:
   - chaincfg
 - package: github.com/decred/dcrrpcclient
+  version: decodeaddress
+  repo: https://github.com/dnldd/dcrrpcclient.git
 - package: github.com/decred/dcrutil
+  version: 58e046aab848365647c44b295f4fab078fbc3392
+  repo: https://github.com/dnldd/dcrutil.git
