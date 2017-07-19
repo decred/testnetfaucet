@@ -1,20 +1,23 @@
-hash: 6d15f352825dce9f7fd6fcd1be2a2d678851f1bf67aa7a7dcc1edfd13ceae95f
-updated: 2017-03-31T12:03:00.757127967-04:00
+hash: a3242ac59ceb8809f77e90aba8c7270a9a8824fe46ffa257e8aa75bc8ac1e609
+updated: 2017-07-19T21:45:54.330344511Z
 imports:
+- name: github.com/agl/ed25519
+  version: 278e1ec8e8a6e017cd07577924d6766039146ced
+  subpackages:
+  - edwards25519
 - name: github.com/btcsuite/btclog
-  version: 73889fb79bd687870312b6e40effcecffbd57d30
+  version: 84c8d2346e9fc8c7b947e243b9c24e6df9fd206a
 - name: github.com/btcsuite/go-socks
   version: 4720035b7bfd2a9bb130b1c184f8bbe41b6f0d0f
   subpackages:
   - socks
-- name: github.com/btcsuite/seelog
-  version: 313961b101eb55f65ae0f03ddd4e322731763b6c
 - name: github.com/btcsuite/websocket
   version: 31079b6807923eb23992c421b114992b95131b55
 - name: github.com/decred/blake256
   version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrd
-  version: 64a414c64fd59706460f47c2aef5930a9e86dce4
+  version: d03f79985b3fb3239de2b2b76ff104133bd7d700
+  repo: https://github.com/dnldd/dcrd.git
   subpackages:
   - blockchain/stake
   - blockchain/stake/internal/dbnamespace
@@ -31,17 +34,15 @@ imports:
   - txscript
   - wire
 - name: github.com/decred/dcrrpcclient
-  version: a24e0b968f2379a5882781f11494354ca2af4453
+  version: 43c2ab1326d3081b8bcb8069e64fc5aaa35bf3dc
+  repo: https://github.com/dnldd/dcrrpcclient.git
 - name: github.com/decred/dcrutil
-  version: ebd2e98736e819ac043d54439969b30144b92ced
+  version: 58e046aab848365647c44b295f4fab078fbc3392
+  repo: https://github.com/dnldd/dcrutil.git
   subpackages:
   - base58
-- name: github.com/decred/ed25519
-  version: b0909d3f798b97a03c9e77023f97a5301a2a7900
-  subpackages:
-  - edwards25519
 - name: golang.org/x/crypto
-  version: 3cb07270c9455e8ad27956a70891c962d121a228
+  version: 4bc1c249b153ce1da9f55437759cec51fe6acabb
   subpackages:
   - ripemd160
 testImports: []
