@@ -10,7 +10,7 @@ information about the tesnet hardfork voting.
 ``` bash
 git clone https://github.com/decred/testnetfaucet.git
 cd testnetfaucet
-glide install
+dep ensure
 go install
 ```
 
