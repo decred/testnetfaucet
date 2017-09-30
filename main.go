@@ -90,10 +90,10 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		}
 		r.ParseForm()
 		address := r.FormValue("address")
-		addr, err := dcrutil.DecodeAddress(address, activeNetParams)
+		addr, err := dcrutil.DecodeAddress(address)
 		if err != nil {
 			testnetFaucetInformation.Error = err
-		} else {
+		} else if addr.IsForNet(activeNetParams) {
 			resp, err := dcrwClient.SendToAddress(addr, 10000000000)
 			if err != nil {
 				testnetFaucetInformation.Error = err
@@ -101,6 +101,9 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 			} else {
 				testnetFaucetInformation.Success = resp.String()
 			}
+		} else {
+			testnetFaucetInformation.Error = fmt.Errorf("address "+
+				"%s is not for %s", addr, activeNetParams.Name)
 		}
 		err = tmpl.Execute(w, testnetFaucetInformation)
 		if err != nil {

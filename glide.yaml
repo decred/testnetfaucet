@@ -1,7 +1,0 @@
-package: github.com/decred/testnetfaucet
-import:
-- package: github.com/decred/dcrd
-  subpackages:
-  - chaincfg
-- package: github.com/decred/dcrrpcclient
-- package: github.com/decred/dcrutil
