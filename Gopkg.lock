@@ -33,21 +33,15 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/decred/dcrd"
-  packages = ["blockchain/stake","blockchain/stake/internal/dbnamespace","blockchain/stake/internal/ticketdb","blockchain/stake/internal/tickettreap","chaincfg","chaincfg/chainec","chaincfg/chainhash","database","dcrec/edwards","dcrec/secp256k1","dcrec/secp256k1/schnorr","dcrjson","txscript","wire"]
-  revision = "f11fac8134626768ef7b1f278fd4331f004bfb49"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/decred/dcrrpcclient"
+  name = "github.com/decred/base58"
   packages = ["."]
-  revision = "efe7aaf4a0f0616b75e3f3ad8fa494572ff96760"
+  revision = "b3520e187fa8ebe65eb74245408cf4b83e6a65d3"
 
 [[projects]]
   branch = "master"
-  name = "github.com/decred/dcrutil"
-  packages = [".","base58"]
-  revision = "ddbde93f65ab0692e54ed8a5ad325fa2e8af4daa"
+  name = "github.com/decred/dcrd"
+  packages = ["blockchain/stake","blockchain/stake/internal/dbnamespace","blockchain/stake/internal/ticketdb","blockchain/stake/internal/tickettreap","chaincfg","chaincfg/chainec","chaincfg/chainhash","database","dcrec/edwards","dcrec/secp256k1","dcrec/secp256k1/schnorr","dcrjson","dcrutil","rpcclient","txscript","wire"]
+  revision = "e14519348390e77af99d32480fb410d49b05043f"
 
 [[projects]]
   branch = "master"
@@ -58,6 +52,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9199be4cdeaf63016fe690f6e48c2de646c8e29657b28128968a87ad176f9f47"
+  inputs-digest = "ebf614de24608b99bb45cfcb77c14ab521c5e28ccc756ccf53dc97fd42041671"
   solver-name = "gps-cdcl"
   solver-version = 1

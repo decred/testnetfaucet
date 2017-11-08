@@ -16,8 +16,8 @@ import (
 	"net"
 
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrrpcclient"
-	"github.com/decred/dcrutil"
+	"github.com/decred/dcrd/dcrutil"
+	"github.com/decred/dcrd/rpcclient"
 )
 
 // Settings for daemon
@@ -28,7 +28,7 @@ var dcrwPass = "PASSWORD"
 
 // Daemon Params to use
 var activeNetParams = &chaincfg.TestNet2Params
-var dcrwClient *dcrrpcclient.Client
+var dcrwClient *rpcclient.Client
 
 // Map of received IP requests for funds.
 var requestedIps map[string]time.Time
@@ -126,7 +126,7 @@ func main() {
 	fmt.Printf("Attempting to connect to dcrd RPC %s as user %s "+
 		"using certificate located in %s\n",
 		dcrwServer, dcrwUser, dcrwCertPath)
-	connCfgDaemon := &dcrrpcclient.ConnConfig{
+	connCfgDaemon := &rpcclient.ConnConfig{
 		Host:         dcrwServer,
 		Endpoint:     "ws",
 		User:         dcrwUser,
@@ -134,7 +134,7 @@ func main() {
 		Certificates: dcrwCerts,
 		DisableTLS:   false,
 	}
-	dcrwClient, err = dcrrpcclient.New(connCfgDaemon, nil)
+	dcrwClient, err = rpcclient.New(connCfgDaemon, nil)
 	if err != nil {
 		fmt.Printf("Failed to start dcrd rpcclient: %s\n", err.Error())
 		os.Exit(1)
