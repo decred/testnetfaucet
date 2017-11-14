@@ -15,91 +15,120 @@ import (
 
 	"net"
 
-	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/rpcclient"
 )
 
-// Settings for daemon
-var dcrwCertPath = ("/home/user/.dcrwallet/rpc.cert")
-var dcrwServer = "127.0.0.1:19110"
-var dcrwUser = "USER"
-var dcrwPass = "PASSWORD"
+var (
+	cfg *config
+)
 
 // Daemon Params to use
-var activeNetParams = &chaincfg.TestNet2Params
 var dcrwClient *rpcclient.Client
 
 // Map of received IP requests for funds.
-var requestedIps map[string]time.Time
-var ipTimeoutValue = 10 * time.Minute // 10 minutes
-
-// Webserver settings
-var listeningPort = ":8001"
+var requestIPs map[string]int64
 
 // Overall Data structure given to the template to render
 type testnetFaucetInfo struct {
+	Address     string
+	Amount      float64
 	BlockHeight int64
-	Balance     int64
+	Balance     float64
+	Limit       int64
 	Error       error
 	Success     string
 }
 
-var funcMap = template.FuncMap{
-	"minus": minus,
-}
-
-func minus(a, b int) int {
-	return a - b
-}
-
 func requestFunds(w http.ResponseWriter, r *http.Request) {
 	fp := filepath.Join("public/views", "design_sketch.html")
+	testnetFaucetInformation := &testnetFaucetInfo{
+		Address: cfg.WalletAddress,
+		Amount:  cfg.WithdrawalAmount,
+		Limit:   cfg.WithdrawalTimeLimit,
+	}
+
 	tmpl, err := template.New("home").ParseFiles(fp)
+
 	if err != nil {
 		panic(err)
 	}
 	if r.Method == "GET" {
-		err = tmpl.Execute(w, nil)
+		err = tmpl.Execute(w, testnetFaucetInformation)
 		if err != nil {
 			panic(err)
 		}
 	} else {
-		testnetFaucetInformation := &testnetFaucetInfo{}
+		// calculate balance
+		gbr, err := dcrwClient.GetBalance("default")
+		if err != nil {
+			testnetFaucetInformation.Error = err
+			err = tmpl.Execute(w, testnetFaucetInformation)
+			if err != nil {
+				panic(err)
+			}
+			return
+		}
+
+		spendable := float64(0)
+		for _, v := range gbr.Balances {
+			spendable = v.Spendable + spendable
+		}
+		testnetFaucetInformation.Balance = spendable
+
+		r.ParseForm()
+		address := r.FormValue("address")
+		overrideToken := r.FormValue("overrideToken")
+
+		// enforce ratelimit unless overridetoken was specified and matches
 		hostIP, err := getClientIP(r)
 		if err != nil {
 			panic(err)
 		}
-		timeOut, ok := requestedIps[hostIP]
-		if !ok {
-			requestedIps[hostIP] = time.Now()
-		} else {
-			// If time saved in the requestedIps map is less than
-			// ten minutes later than don't allow request
-			if time.Since(timeOut) < ipTimeoutValue {
-				err = fmt.Errorf("To ensure everyone has equal access to testnet "+
-					"coins, we have a timeout per IP address of %s."+
-					" Please try again shortly", ipTimeoutValue.String())
+
+		if overrideToken != cfg.OverrideToken {
+			lastRequestTime, found := requestIPs[hostIP]
+			if found {
+				nextAllowedRequest := lastRequestTime + cfg.WithdrawalTimeLimit
+				coolDownTime := nextAllowedRequest - time.Now().Unix()
+
+				if coolDownTime >= 0 {
+					err = fmt.Errorf("You may only withdraw %v DCR every "+
+						"%v seconds.  Please wait another %v seconds.",
+						cfg.WithdrawalAmount, cfg.WithdrawalTimeLimit, coolDownTime)
+					testnetFaucetInformation.Error = err
+					err = tmpl.Execute(w, testnetFaucetInformation)
+					if err != nil {
+						panic(err)
+					}
+					return
+				}
+			}
+		}
+
+		// Try to send the tx if we can.
+		addr, err := dcrutil.DecodeAddress(address)
+		if err != nil {
+			testnetFaucetInformation.Error = err
+		} else if addr.IsForNet(activeNetParams.Params) {
+			amount, err := dcrutil.NewAmount(cfg.WithdrawalAmount)
+			if err != nil {
 				testnetFaucetInformation.Error = err
 				err = tmpl.Execute(w, testnetFaucetInformation)
 				if err != nil {
 					panic(err)
 				}
-				return
 			}
-		}
-		r.ParseForm()
-		address := r.FormValue("address")
-		addr, err := dcrutil.DecodeAddress(address)
-		if err != nil {
-			testnetFaucetInformation.Error = err
-		} else if addr.IsForNet(activeNetParams) {
-			resp, err := dcrwClient.SendToAddress(addr, 10000000000)
+			resp, err := dcrwClient.SendToAddress(addr, amount)
 			if err != nil {
+				log.Errorf("error sending %v to %v for %v: %v",
+					amount, addr, hostIP, err)
 				testnetFaucetInformation.Error = err
-
 			} else {
 				testnetFaucetInformation.Success = resp.String()
+				requestIPs[hostIP] = time.Now().Unix()
+				log.Infof("successfully sent %v to %v for %v",
+					amount, addr, hostIP)
 			}
 		} else {
 			testnetFaucetInformation.Error = fmt.Errorf("address "+
@@ -113,36 +142,44 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	quit := make(chan struct{})
-
-	requestedIps = make(map[string]time.Time)
-	var dcrwCerts []byte
-	dcrwCerts, err := ioutil.ReadFile(dcrwCertPath)
+	// Load configuration and parse command line.  This function also
+	// initializes logging and configures it accordingly.
+	loadedCfg, _, err := loadConfig()
 	if err != nil {
-		fmt.Printf("Failed to read dcrd cert file at %s: %s\n", dcrwCertPath,
+		return
+	}
+
+	cfg = loadedCfg
+
+	quit := make(chan struct{})
+	requestIPs = make(map[string]int64)
+
+	dcrwCerts, err := ioutil.ReadFile(cfg.WalletCert)
+	if err != nil {
+		log.Errorf("Failed to read dcrd cert file at %s: %s\n", cfg.WalletCert,
 			err.Error())
 		os.Exit(1)
 	}
-	fmt.Printf("Attempting to connect to dcrd RPC %s as user %s "+
-		"using certificate located in %s\n",
-		dcrwServer, dcrwUser, dcrwCertPath)
+	log.Infof("Attempting to connect to dcrd RPC %s as user %s "+
+		"using certificate located in %s",
+		cfg.WalletHost, cfg.WalletUser, cfg.WalletCert)
 	connCfgDaemon := &rpcclient.ConnConfig{
-		Host:         dcrwServer,
+		Host:         cfg.WalletHost,
 		Endpoint:     "ws",
-		User:         dcrwUser,
-		Pass:         dcrwPass,
+		User:         cfg.WalletUser,
+		Pass:         cfg.WalletPassword,
 		Certificates: dcrwCerts,
 		DisableTLS:   false,
 	}
 	dcrwClient, err = rpcclient.New(connCfgDaemon, nil)
 	if err != nil {
-		fmt.Printf("Failed to start dcrd rpcclient: %s\n", err.Error())
+		log.Errorf("Failed to start dcrd rpcclient: %s\n", err.Error())
 		os.Exit(1)
 	}
 
 	go func() {
 		<-quit
-		fmt.Printf("\nClosing testnet demo.\n")
+		log.Info("Closing testnet demo.")
 		dcrwClient.Disconnect()
 		os.Exit(1)
 	}()
@@ -151,9 +188,9 @@ func main() {
 	http.Handle("/fonts/", http.StripPrefix("/fonts/", http.FileServer(http.Dir("public/fonts/"))))
 	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("public/images/"))))
 	http.HandleFunc("/", requestFunds)
-	err = http.ListenAndServe(listeningPort, nil)
+	err = http.ListenAndServe(cfg.Listen, nil)
 	if err != nil {
-		fmt.Printf("Failed to bind http server: %s\n", err.Error())
+		log.Errorf("Failed to bind http server: %s\n", err.Error())
 	}
 }
 
@@ -163,7 +200,7 @@ func main() {
 func getClientIP(r *http.Request) (string, error) {
 	xRealIP := r.Header.Get("X-Real-IP")
 	if len(xRealIP) == 0 {
-		fmt.Println(`"X-Real-IP" header invalid, using RemoteAddr instead`)
+		log.Warn(`"X-Real-IP" header invalid, using RemoteAddr instead`)
 		host, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
 			return "", err
