@@ -143,7 +143,7 @@ func main() {
 
 	dcrwCerts, err := ioutil.ReadFile(cfg.WalletCert)
 	if err != nil {
-		log.Errorf("Failed to read dcrd cert file at %s: %s\n", cfg.WalletCert,
+		log.Errorf("Failed to read dcrd cert file at %s: %s", cfg.WalletCert,
 			err.Error())
 		os.Exit(1)
 	}
@@ -160,7 +160,7 @@ func main() {
 	}
 	dcrwClient, err = rpcclient.New(connCfgDaemon, nil)
 	if err != nil {
-		log.Errorf("Failed to start dcrd rpcclient: %s\n", err.Error())
+		log.Errorf("Failed to start dcrd rpcclient: %s", err.Error())
 		os.Exit(1)
 	}
 	updateBalance(dcrwClient)
@@ -178,7 +178,7 @@ func main() {
 	http.HandleFunc("/", requestFunds)
 	err = http.ListenAndServe(cfg.Listen, nil)
 	if err != nil {
-		log.Errorf("Failed to bind http server: %s\n", err.Error())
+		log.Errorf("Failed to bind http server: %s", err.Error())
 	}
 }
 
