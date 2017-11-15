@@ -26,6 +26,8 @@ var (
 // Daemon Params to use
 var dcrwClient *rpcclient.Client
 
+var lastBalance float64
+
 // Map of received IP requests for funds.
 var requestIPs map[string]int64
 
@@ -44,48 +46,32 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	fp := filepath.Join("public/views", "design_sketch.html")
 	testnetFaucetInformation := &testnetFaucetInfo{
 		Address: cfg.WalletAddress,
+		Balance: lastBalance,
 		Amount:  cfg.WithdrawalAmount,
 		Limit:   cfg.WithdrawalTimeLimit,
 	}
 
 	tmpl, err := template.New("home").ParseFiles(fp)
-
 	if err != nil {
 		panic(err)
 	}
+
+	r.ParseForm()
+	address := r.FormValue("address")
+	overrideToken := r.FormValue("overrideToken")
+
+	hostIP, err := getClientIP(r)
+	if err != nil {
+		panic(err)
+	}
+
 	if r.Method == "GET" {
 		err = tmpl.Execute(w, testnetFaucetInformation)
 		if err != nil {
 			panic(err)
 		}
 	} else {
-		// calculate balance
-		gbr, err := dcrwClient.GetBalance("default")
-		if err != nil {
-			testnetFaucetInformation.Error = err
-			err = tmpl.Execute(w, testnetFaucetInformation)
-			if err != nil {
-				panic(err)
-			}
-			return
-		}
-
-		spendable := float64(0)
-		for _, v := range gbr.Balances {
-			spendable = v.Spendable + spendable
-		}
-		testnetFaucetInformation.Balance = spendable
-
-		r.ParseForm()
-		address := r.FormValue("address")
-		overrideToken := r.FormValue("overrideToken")
-
 		// enforce ratelimit unless overridetoken was specified and matches
-		hostIP, err := getClientIP(r)
-		if err != nil {
-			panic(err)
-		}
-
 		if overrideToken != cfg.OverrideToken {
 			lastRequestTime, found := requestIPs[hostIP]
 			if found {
@@ -129,6 +115,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 				requestIPs[hostIP] = time.Now().Unix()
 				log.Infof("successfully sent %v to %v for %v",
 					amount, addr, hostIP)
+				updateBalance(dcrwClient)
 			}
 		} else {
 			testnetFaucetInformation.Error = fmt.Errorf("address "+
@@ -176,6 +163,7 @@ func main() {
 		log.Errorf("Failed to start dcrd rpcclient: %s\n", err.Error())
 		os.Exit(1)
 	}
+	updateBalance(dcrwClient)
 
 	go func() {
 		<-quit
@@ -209,4 +197,21 @@ func getClientIP(r *http.Request) (string, error) {
 	}
 
 	return xRealIP, nil
+}
+
+func updateBalance(c *rpcclient.Client) {
+	// calculate balance
+	gbr, err := c.GetBalance("default")
+	if err != nil {
+		log.Warnf("unable to update balance: %v", err)
+		return
+	}
+
+	spendable := float64(0)
+	for _, v := range gbr.Balances {
+		spendable = v.Spendable + spendable
+	}
+
+	log.Infof("updating balance from %v to %v", lastBalance, spendable)
+	lastBalance = spendable
 }
