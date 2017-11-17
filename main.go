@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"net"
@@ -57,8 +58,10 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.ParseForm()
-	address := r.FormValue("address")
-	overrideToken := r.FormValue("overrideToken")
+	addressInput := r.FormValue("address")
+	amount := cfg.WithdrawalAmount
+	amountInput := r.FormValue("amount")
+	overridetokenInput := r.FormValue("overridetoken")
 
 	hostIP, err := getClientIP(r)
 	if err != nil {
@@ -72,7 +75,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// enforce ratelimit unless overridetoken was specified and matches
-		if overrideToken != cfg.OverrideToken {
+		if overridetokenInput != cfg.OverrideToken {
 			lastRequestTime, found := requestIPs[hostIP]
 			if found {
 				nextAllowedRequest := lastRequestTime + cfg.WithdrawalTimeLimit
@@ -92,12 +95,19 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		if overridetokenInput == cfg.OverrideToken {
+			amount, err = strconv.ParseFloat(amountInput, 32)
+			if err != nil {
+				testnetFaucetInformation.Error = fmt.Errorf("invalid amount input: %v", err)
+			}
+		}
+
 		// Try to send the tx if we can.
-		addr, err := dcrutil.DecodeAddress(address)
+		address, err := dcrutil.DecodeAddress(addressInput)
 		if err != nil {
 			testnetFaucetInformation.Error = err
-		} else if addr.IsForNet(activeNetParams.Params) {
-			amount, err := dcrutil.NewAmount(cfg.WithdrawalAmount)
+		} else if address.IsForNet(activeNetParams.Params) {
+			dcramount, err := dcrutil.NewAmount(amount)
 			if err != nil {
 				testnetFaucetInformation.Error = err
 				err = tmpl.Execute(w, testnetFaucetInformation)
@@ -105,21 +115,21 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 					panic(err)
 				}
 			}
-			resp, err := dcrwClient.SendToAddress(addr, amount)
+			resp, err := dcrwClient.SendToAddress(address, dcramount)
 			if err != nil {
 				log.Errorf("error sending %v to %v for %v: %v",
-					amount, addr, hostIP, err)
+					amount, address, hostIP, err)
 				testnetFaucetInformation.Error = err
 			} else {
 				testnetFaucetInformation.Success = resp.String()
 				requestIPs[hostIP] = time.Now().Unix()
 				log.Infof("successfully sent %v to %v for %v",
-					amount, addr, hostIP)
+					amount, address, hostIP)
 				updateBalance(dcrwClient)
 			}
 		} else {
 			testnetFaucetInformation.Error = fmt.Errorf("address "+
-				"%s is not for %s", addr, activeNetParams.Name)
+				"%s is not for %s", address, activeNetParams.Name)
 		}
 		err = tmpl.Execute(w, testnetFaucetInformation)
 		if err != nil {
