@@ -5,6 +5,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -21,15 +22,20 @@ import (
 )
 
 var (
-	cfg *config
+	cfg          *config
+	dailyPercent = float64(10)
 )
+
+// Balance and limits
+var dailyLimit float64
+var lastBalance float64
+var transactionLimit float64
 
 // Daemon Params to use
 var dcrwClient *rpcclient.Client
 
-var lastBalance float64
-
 // Map of received IP requests for funds.
+var requestAmounts map[int64]float64
 var requestIPs map[string]int64
 
 // Overall Data structure given to the template to render
@@ -38,18 +44,23 @@ type testnetFaucetInfo struct {
 	Amount      float64
 	BlockHeight int64
 	Balance     float64
-	Limit       int64
+	DailyLimit  float64
 	Error       error
+	Limit       int64
+	SentToday   float64
 	Success     string
 }
 
 func requestFunds(w http.ResponseWriter, r *http.Request) {
 	fp := filepath.Join("public/views", "design_sketch.html")
+	amountSentToday := calculateAmountSentToday()
 	testnetFaucetInformation := &testnetFaucetInfo{
-		Address: cfg.WalletAddress,
-		Balance: lastBalance,
-		Amount:  cfg.WithdrawalAmount,
-		Limit:   cfg.WithdrawalTimeLimit,
+		Address:    cfg.WalletAddress,
+		Amount:     cfg.WithdrawalAmount,
+		Balance:    lastBalance,
+		DailyLimit: dailyLimit,
+		Limit:      cfg.WithdrawalTimeLimit,
+		SentToday:  amountSentToday,
 	}
 
 	tmpl, err := template.New("home").ParseFiles(fp)
@@ -95,11 +106,37 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// check
 		if overridetokenInput == cfg.OverrideToken {
 			amount, err = strconv.ParseFloat(amountInput, 32)
 			if err != nil {
-				testnetFaucetInformation.Error = fmt.Errorf("invalid amount input: %v", err)
+				testnetFaucetInformation.Error = fmt.Errorf("amount invalid: %v", err)
+				err = tmpl.Execute(w, testnetFaucetInformation)
+				if err != nil {
+					panic(err)
+				}
+				return
 			}
+		}
+
+		// enforce the transaction limit unconditionally
+		if amount > transactionLimit {
+			testnetFaucetInformation.Error = errors.New("amount exceeds limit")
+			err = tmpl.Execute(w, testnetFaucetInformation)
+			if err != nil {
+				panic(err)
+			}
+			return
+		}
+
+		// enforce the daily limit unconditionally
+		if amountSentToday+amount >= dailyLimit {
+			testnetFaucetInformation.Error = errors.New("daily limit reached")
+			err = tmpl.Execute(w, testnetFaucetInformation)
+			if err != nil {
+				panic(err)
+			}
+			return
 		}
 
 		// Try to send the tx if we can.
@@ -122,6 +159,8 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 				testnetFaucetInformation.Error = err
 			} else {
 				testnetFaucetInformation.Success = resp.String()
+				testnetFaucetInformation.SentToday = testnetFaucetInformation.SentToday + amount
+				requestAmounts[time.Now().Unix()] = amount
 				requestIPs[hostIP] = time.Now().Unix()
 				log.Infof("successfully sent %v to %v for %v",
 					amount, address, hostIP)
@@ -149,6 +188,7 @@ func main() {
 	cfg = loadedCfg
 
 	quit := make(chan struct{})
+	requestAmounts = make(map[int64]float64)
 	requestIPs = make(map[string]int64)
 
 	dcrwCerts, err := ioutil.ReadFile(cfg.WalletCert)
@@ -174,6 +214,8 @@ func main() {
 		os.Exit(1)
 	}
 	updateBalance(dcrwClient)
+	dailyLimit = lastBalance / dailyPercent
+	log.Infof("daily limit %v per transaction limit %v", dailyLimit, transactionLimit)
 
 	go func() {
 		<-quit
@@ -224,4 +266,20 @@ func updateBalance(c *rpcclient.Client) {
 
 	log.Infof("updating balance from %v to %v", lastBalance, spendable)
 	lastBalance = spendable
+	transactionLimit = spendable / 100
+}
+
+func calculateAmountSentToday() float64 {
+	amountToday := float64(0)
+
+	for then, amount := range requestAmounts {
+		now := time.Now().Unix()
+		if now-then >= 24*60*60 {
+			continue
+		}
+
+		amountToday = amountToday + amount
+	}
+
+	return amountToday
 }
