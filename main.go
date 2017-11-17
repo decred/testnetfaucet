@@ -106,8 +106,8 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// check
-		if overridetokenInput == cfg.OverrideToken {
+		// check amount if specified
+		if overridetokenInput == cfg.OverrideToken && amountInput != "" {
 			amount, err = strconv.ParseFloat(amountInput, 32)
 			if err != nil {
 				testnetFaucetInformation.Error = fmt.Errorf("amount invalid: %v", err)
