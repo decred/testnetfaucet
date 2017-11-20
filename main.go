@@ -5,6 +5,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -38,6 +39,11 @@ var dcrwClient *rpcclient.Client
 var requestAmounts map[int64]float64
 var requestIPs map[string]int64
 
+type jsonResponse struct {
+	Txid  string
+	Error string
+}
+
 // Overall Data structure given to the template to render
 type testnetFaucetInfo struct {
 	Address     string
@@ -68,12 +74,6 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	r.ParseForm()
-	addressInput := r.FormValue("address")
-	amount := cfg.WithdrawalAmount
-	amountInput := r.FormValue("amount")
-	overridetokenInput := r.FormValue("overridetoken")
-
 	hostIP, err := getClientIP(r)
 	if err != nil {
 		panic(err)
@@ -83,6 +83,18 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		sendReply(w, r, tmpl, testnetFaucetInformation, nil)
 		return
 	}
+
+	if err := r.ParseForm(); err != nil {
+		sendReply(w, r, tmpl, testnetFaucetInformation, err)
+		return
+	}
+
+	log.Infof("r %v", r)
+	addressInput := r.FormValue("address")
+	amount := cfg.WithdrawalAmount
+	amountInput := r.FormValue("amount")
+	overridetokenInput := r.FormValue("overridetoken")
+	log.Infof("addressInput %v", addressInput)
 
 	// enforce ratelimit unless overridetoken was specified and matches
 	if overridetokenInput != cfg.OverrideToken {
@@ -128,6 +140,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	// Decode address and amount and send transaction.
 	address, err := dcrutil.DecodeAddress(addressInput)
 	if err != nil {
+		log.Errorf("ip %v submitted bad address %v", hostIP, addressInput)
 		sendReply(w, r, tmpl, testnetFaucetInformation, err)
 		return
 	}
@@ -237,10 +250,19 @@ func main() {
 }
 
 func sendReply(w http.ResponseWriter, r *http.Request, tmpl *template.Template, info *testnetFaucetInfo, err error) {
+	jsonResp := &jsonResponse{}
+
 	if err != nil {
 		info.Error = err
+		jsonResp.Error = err.Error()
+		jsonResp.Txid = ""
+	} else {
+		jsonResp.Error = ""
+		jsonResp.Txid = info.Success
 	}
 
+	json, _ := json.Marshal(jsonResp)
+	w.Header().Set("X-Json-Reply", string(json))
 	err = tmpl.Execute(w, info)
 	if err != nil {
 		panic(err)
