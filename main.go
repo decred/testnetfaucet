@@ -80,101 +80,103 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "GET" {
-		err = tmpl.Execute(w, testnetFaucetInformation)
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		// enforce ratelimit unless overridetoken was specified and matches
-		if overridetokenInput != cfg.OverrideToken {
-			lastRequestTime, found := requestIPs[hostIP]
-			if found {
-				nextAllowedRequest := lastRequestTime + cfg.WithdrawalTimeLimit
-				coolDownTime := nextAllowedRequest - time.Now().Unix()
+		sendReply(w, r, tmpl, testnetFaucetInformation, nil)
+		return
+	}
 
-				if coolDownTime >= 0 {
-					err = fmt.Errorf("You may only withdraw %v DCR every "+
-						"%v seconds.  Please wait another %v seconds.",
-						cfg.WithdrawalAmount, cfg.WithdrawalTimeLimit, coolDownTime)
-					testnetFaucetInformation.Error = err
-					err = tmpl.Execute(w, testnetFaucetInformation)
-					if err != nil {
-						panic(err)
-					}
-					return
-				}
-			}
-		}
+	// enforce ratelimit unless overridetoken was specified and matches
+	if overridetokenInput != cfg.OverrideToken {
+		lastRequestTime, found := requestIPs[hostIP]
+		if found {
+			nextAllowedRequest := lastRequestTime + cfg.WithdrawalTimeLimit
+			coolDownTime := nextAllowedRequest - time.Now().Unix()
 
-		// check amount if specified
-		if overridetokenInput == cfg.OverrideToken && amountInput != "" {
-			amount, err = strconv.ParseFloat(amountInput, 32)
-			if err != nil {
-				testnetFaucetInformation.Error = fmt.Errorf("amount invalid: %v", err)
-				err = tmpl.Execute(w, testnetFaucetInformation)
-				if err != nil {
-					panic(err)
-				}
+			if coolDownTime >= 0 {
+				err = fmt.Errorf("You may only withdraw %v DCR every "+
+					"%v seconds.  Please wait another %v seconds.",
+					cfg.WithdrawalAmount, cfg.WithdrawalTimeLimit, coolDownTime)
+				sendReply(w, r, tmpl, testnetFaucetInformation, err)
 				return
 			}
 		}
+	}
 
-		// enforce the transaction limit unconditionally
-		if amount > transactionLimit {
-			testnetFaucetInformation.Error = errors.New("amount exceeds limit")
-			err = tmpl.Execute(w, testnetFaucetInformation)
-			if err != nil {
-				panic(err)
-			}
-			return
-		}
-
-		// enforce the daily limit unconditionally
-		if amountSentToday+amount >= dailyLimit {
-			testnetFaucetInformation.Error = errors.New("daily limit reached")
-			err = tmpl.Execute(w, testnetFaucetInformation)
-			if err != nil {
-				panic(err)
-			}
-			return
-		}
-
-		// Try to send the tx if we can.
-		address, err := dcrutil.DecodeAddress(addressInput)
+	// check amount if specified
+	if overridetokenInput == cfg.OverrideToken && amountInput != "" {
+		amount, err = strconv.ParseFloat(amountInput, 32)
 		if err != nil {
-			testnetFaucetInformation.Error = err
-		} else if address.IsForNet(activeNetParams.Params) {
-			dcramount, err := dcrutil.NewAmount(amount)
-			if err != nil {
-				testnetFaucetInformation.Error = err
-				err = tmpl.Execute(w, testnetFaucetInformation)
-				if err != nil {
-					panic(err)
-				}
-			}
-			resp, err := dcrwClient.SendToAddress(address, dcramount)
-			if err != nil {
-				log.Errorf("error sending %v to %v for %v: %v",
-					amount, address, hostIP, err)
-				testnetFaucetInformation.Error = err
-			} else {
-				testnetFaucetInformation.Success = resp.String()
-				testnetFaucetInformation.SentToday = testnetFaucetInformation.SentToday + amount
-				requestAmounts[time.Now().Unix()] = amount
-				requestIPs[hostIP] = time.Now().Unix()
-				log.Infof("successfully sent %v to %v for %v",
-					amount, address, hostIP)
-				updateBalance(dcrwClient)
-			}
-		} else {
-			testnetFaucetInformation.Error = fmt.Errorf("address "+
-				"%s is not for %s", address, activeNetParams.Name)
-		}
-		err = tmpl.Execute(w, testnetFaucetInformation)
-		if err != nil {
-			panic(err)
+			err = fmt.Errorf("amount invalid: %v", err)
+			sendReply(w, r, tmpl, testnetFaucetInformation, err)
+			return
 		}
 	}
+
+	// enforce the transaction limit unconditionally
+	if amount > transactionLimit {
+		err = errors.New("amount exceeds limit")
+		sendReply(w, r, tmpl, testnetFaucetInformation, err)
+		return
+	}
+
+	// enforce the daily limit unconditionally
+	if amountSentToday+amount >= dailyLimit {
+		err = errors.New("daily limit reached")
+		sendReply(w, r, tmpl, testnetFaucetInformation, err)
+		return
+	}
+
+	// Decode address and amount and send transaction.
+	address, err := dcrutil.DecodeAddress(addressInput)
+	if err != nil {
+		sendReply(w, r, tmpl, testnetFaucetInformation, err)
+		return
+	}
+
+	if !address.IsForNet(activeNetParams.Params) {
+		err = fmt.Errorf("address "+
+			"%s is not for %s", address, activeNetParams.Name)
+		sendReply(w, r, tmpl, testnetFaucetInformation, err)
+		return
+	}
+
+	dcramount, err := dcrutil.NewAmount(amount)
+	if err != nil {
+		sendReply(w, r, tmpl, testnetFaucetInformation, err)
+		return
+	}
+
+	resp, err := dcrwClient.SendToAddress(address, dcramount)
+	if err != nil {
+		log.Errorf("error sending %v to %v for %v: %v",
+			amount, address, hostIP, err)
+		sendReply(w, r, tmpl, testnetFaucetInformation, err)
+		return
+	}
+
+	testnetFaucetInformation.Success = resp.String()
+	testnetFaucetInformation.SentToday = testnetFaucetInformation.SentToday + amount
+	requestAmounts[time.Now().Unix()] = amount
+	requestIPs[hostIP] = time.Now().Unix()
+	log.Infof("successfully sent %v to %v for %v",
+		amount, address, hostIP)
+	updateBalance(dcrwClient)
+
+	sendReply(w, r, tmpl, testnetFaucetInformation, nil)
+}
+
+func calculateAmountSentToday() float64 {
+	amountToday := float64(0)
+
+	for then, amount := range requestAmounts {
+		now := time.Now().Unix()
+		if now-then >= 24*60*60 {
+			continue
+		}
+
+		amountToday = amountToday + amount
+	}
+
+	return amountToday
 }
 
 func main() {
@@ -234,6 +236,17 @@ func main() {
 	}
 }
 
+func sendReply(w http.ResponseWriter, r *http.Request, tmpl *template.Template, info *testnetFaucetInfo, err error) {
+	if err != nil {
+		info.Error = err
+	}
+
+	err = tmpl.Execute(w, info)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // Get the client's real IP address using the X-Real-IP header, or if that is
 // empty, http.Request.RemoteAddr. See the sample nginx.conf for using the
 // real_ip module to correctly set the X-Real-IP header.
@@ -267,19 +280,4 @@ func updateBalance(c *rpcclient.Client) {
 	log.Infof("updating balance from %v to %v", lastBalance, spendable)
 	lastBalance = spendable
 	transactionLimit = spendable / 100
-}
-
-func calculateAmountSentToday() float64 {
-	amountToday := float64(0)
-
-	for then, amount := range requestAmounts {
-		now := time.Now().Unix()
-		if now-then >= 24*60*60 {
-			continue
-		}
-
-		amountToday = amountToday + amount
-	}
-
-	return amountToday
 }
