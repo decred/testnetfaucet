@@ -89,12 +89,10 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Infof("r %v", r)
 	addressInput := r.FormValue("address")
 	amount := cfg.WithdrawalAmount
 	amountInput := r.FormValue("amount")
 	overridetokenInput := r.FormValue("overridetoken")
-	log.Infof("addressInput %v", addressInput)
 
 	// enforce ratelimit unless overridetoken was specified and matches
 	if overridetokenInput != cfg.OverrideToken {
