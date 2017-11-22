@@ -1,7 +1,7 @@
 # testnetfaucet
 
-testnetfaucet is a simple web app that connects to dcrd and displays
-information about the tesnet hardfork voting.
+testnetfaucet is a simple web app that sends a configurable amount of testnet
+Decred via an rpcclient connection to an instance of dcrwallet.
 
 ## Installation
 
@@ -20,9 +20,11 @@ Start dcrwallet with the following options.
 dcrwallet --testnet -u USER -P PASSWORD --rpclisten=127.0.0.1:19111 --rpccert=$HOME/.dcrwallet/rpc.cert
 ```
 
-Start testnetfaucet
+Configure and start testnetfaucet
 
 ```bash
+mkdir ~/.testnetfaucet
+cp sample-testnetfaucet.conf ~/.testnetfaucet/testnetfaucet.conf (and edit appropriately)
 testnetfaucet
 ```
 
