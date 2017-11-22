@@ -30,6 +30,7 @@ const (
 	defaultListen                = ":8000"
 	defaultPublicPath            = "public"
 	defaultTemplatePath          = "views"
+	defaultWallertCert           = "~/.dcrwallet/rpc.cert"
 	defaultWithdrawalAmount      = 2
 	defaultWithdrawalTimeSeconds = 30
 )
@@ -252,6 +253,7 @@ func loadConfig() (*config, []string, error) {
 		LogDir:              defaultLogDir,
 		Listen:              defaultListen,
 		WalletAddress:       defaultWalletAddress,
+		WalletCert:          defaultWallertCert,
 		WithdrawalAmount:    defaultWithdrawalAmount,
 		WithdrawalTimeLimit: defaultWithdrawalTimeSeconds,
 		Version:             version(),
@@ -358,6 +360,8 @@ func loadConfig() (*config, []string, error) {
 	// per network in the same fashion as the data directory.
 	cfg.LogDir = cleanAndExpandPath(cfg.LogDir)
 	cfg.LogDir = filepath.Join(cfg.LogDir, netName(activeNetParams))
+
+	cfg.WalletCert = cleanAndExpandPath(cfg.WalletCert)
 
 	// Special show command to list supported subsystems and exit.
 	if cfg.DebugLevel == "show" {
