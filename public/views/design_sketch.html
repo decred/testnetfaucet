@@ -58,7 +58,7 @@
 
         <div class="col-md-6">
           <p>
-            Please enter your Testnet Decred address and press send.  There is a 10min timeout per IP to avoid draining of the wallet.  For now each request will send 100 DCR.
+            Welcome to the Decred Testnet Faucet. The faucet will send {{.Amount}} DCR every {{.Limit}} seconds.  If you need more than this, please contact ay-p, davecgh, dhill, jolan, or jrick through one of the communication methods listed on the <a href="https://decred.org/">Decred website</a>.
           </p>
 	        <p>
 	          <a href="https://hardforkdemo.decred.org" target="_blank" class="btn-sm btn-info">&rarr; Visit the Hardfork Monitor</a>
@@ -74,13 +74,15 @@
           {{end}}
           {{if .Success}}
           <div class="alert alert-success">
-            <p>Success! See the tx status: <a href="https://testnet.decred.org/tx/{{.Success}}">{{.Success}}</a></p>
+            <p>Success! Transaction {{.Success}} has been sent.  You may see it on <a href="https://testnet.dcrdata.org/explorer/tx/{{.Success}}">DCRData</a> or <a href="https://testnet.decred.org/tx/{{.Success}}">Insight</a>.</p>
           </div>
           {{end}}
 	        <!-- FORM BEGINS HERE -->
           <form action="/requestfaucet" class="form-horizontal" method="post">
 	          <div class="form-group">
               <input class="form-control input-md" type="text" name="address" placeholder="Address" required>
+              <input type="hidden" name="amount">
+              <input type="hidden" name="overridetoken">
 	          </div>
 	          <div class="form-group">
               <button class="btn btn-primary" type="submit">Send</button>
@@ -90,7 +92,10 @@
       </div><!-- /row -->
       <div class="row">
         <div class="col-md-12">
-          <p class="text-center">Please send any unused Testnet coins back to the faucet wallet: TsUbDcvcT2GeSYUPdEdiEgPqay2XFUdsS6A</p>
+          <p class="text-center">Please send any unused Testnet coins back to the faucet wallet: {{.Address}}<br>
+          Balance left in default account: {{.Balance}} DCR<br>
+          Have sent {{.SentToday}} DCR today. Daily limit {{.DailyLimit}} DCR.<br>
+          The source code is available on <a href="https://github.com/decred/testnetfaucet">GitHub</a>.</p>
         </div>
       </div>
     </div> <!-- /container -->
