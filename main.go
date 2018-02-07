@@ -58,6 +58,7 @@ type testnetFaucetInfo struct {
 }
 
 func requestFunds(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fp := filepath.Join("public/views", "design_sketch.html")
 	amountSentToday := calculateAmountSentToday()
 	testnetFaucetInformation := &testnetFaucetInfo{
@@ -248,6 +249,7 @@ func main() {
 }
 
 func sendReply(w http.ResponseWriter, r *http.Request, tmpl *template.Template, info *testnetFaucetInfo, err error) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	jsonResp := &jsonResponse{}
 
 	if err != nil {
