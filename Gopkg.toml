@@ -2,11 +2,3 @@
 [[constraint]]
   branch = "master"
   name = "github.com/decred/dcrd"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/decred/dcrrpcclient"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/decred/dcrutil"
