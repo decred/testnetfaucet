@@ -250,8 +250,8 @@ func main() {
 
 func sendReply(w http.ResponseWriter, r *http.Request, tmpl *template.Template, info *testnetFaucetInfo, err error) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	jsonResp := &jsonResponse{}
 
+	jsonResp := &jsonResponse{}
 	if err != nil {
 		info.Error = err
 		jsonResp.Error = err.Error()
@@ -260,8 +260,16 @@ func sendReply(w http.ResponseWriter, r *http.Request, tmpl *template.Template, 
 		jsonResp.Error = ""
 		jsonResp.Txid = info.Success
 	}
-
 	json, _ := json.Marshal(jsonResp)
+
+	// Return only raw JSON, if specified.
+	if r.FormValue("json") != "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(json)
+		return
+	}
+
 	w.Header().Set("X-Json-Reply", string(json))
 	err = tmpl.Execute(w, info)
 	if err != nil {
