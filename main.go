@@ -23,12 +23,10 @@ import (
 )
 
 var (
-	cfg          *config
-	dailyPercent = float64(10)
+	cfg *config
 )
 
 // Balance and limits
-var dailyLimit float64
 var lastBalance float64
 var transactionLimit float64
 
@@ -46,15 +44,15 @@ type jsonResponse struct {
 
 // Overall Data structure given to the template to render
 type testnetFaucetInfo struct {
-	Address     string
-	Amount      float64
-	BlockHeight int64
-	Balance     float64
-	DailyLimit  float64
-	Error       error
-	Limit       int64
-	SentToday   float64
-	Success     string
+	Address          string
+	Amount           float64
+	BlockHeight      int64
+	Balance          float64
+	TransactionLimit float64
+	Error            error
+	TimeLimit        int64
+	SentToday        float64
+	Success          string
 }
 
 func requestFunds(w http.ResponseWriter, r *http.Request) {
@@ -62,12 +60,12 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	fp := filepath.Join("public/views", "design_sketch.html")
 	amountSentToday := calculateAmountSentToday()
 	testnetFaucetInformation := &testnetFaucetInfo{
-		Address:    cfg.WalletAddress,
-		Amount:     cfg.WithdrawalAmount,
-		Balance:    lastBalance,
-		DailyLimit: dailyLimit,
-		Limit:      cfg.WithdrawalTimeLimit,
-		SentToday:  amountSentToday,
+		Address:          cfg.WalletAddress,
+		Amount:           cfg.WithdrawalAmount,
+		Balance:          lastBalance,
+		TransactionLimit: transactionLimit,
+		TimeLimit:        cfg.WithdrawalTimeLimit,
+		SentToday:        amountSentToday,
 	}
 
 	tmpl, err := template.New("home").ParseFiles(fp)
@@ -113,7 +111,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check amount if specified
-	if overridetokenInput == cfg.OverrideToken && amountInput != "" {
+	if amountInput != "" {
 		amount, err = strconv.ParseFloat(amountInput, 32)
 		if err != nil {
 			err = fmt.Errorf("amount invalid: %v", err)
@@ -122,16 +120,15 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// enforce the transaction limit unconditionally
-	if amount > transactionLimit {
-		err = errors.New("amount exceeds limit")
+	if amount <= 0 {
+		err = errors.New("amount must be greater than 0")
 		sendReply(w, r, tmpl, testnetFaucetInformation, err)
 		return
 	}
 
-	// enforce the daily limit unconditionally
-	if amountSentToday+amount >= dailyLimit {
-		err = errors.New("daily limit reached")
+	// enforce the transaction limit unconditionally
+	if amount > transactionLimit {
+		err = errors.New("amount exceeds limit")
 		sendReply(w, r, tmpl, testnetFaucetInformation, err)
 		return
 	}
@@ -172,6 +169,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	log.Infof("successfully sent %v to %v for %v",
 		amount, address, hostIP)
 	updateBalance(dcrwClient)
+	testnetFaucetInformation.TransactionLimit = transactionLimit
 
 	sendReply(w, r, tmpl, testnetFaucetInformation, nil)
 }
@@ -228,8 +226,6 @@ func main() {
 		os.Exit(1)
 	}
 	updateBalance(dcrwClient)
-	dailyLimit = lastBalance / dailyPercent
-	log.Infof("daily limit %v per transaction limit %v", dailyLimit, transactionLimit)
 
 	go func() {
 		<-quit
@@ -310,4 +306,5 @@ func updateBalance(c *rpcclient.Client) {
 	log.Infof("updating balance from %v to %v", lastBalance, spendable)
 	lastBalance = spendable
 	transactionLimit = spendable / 100
+	log.Infof("updating transaction limit to %v", transactionLimit)
 }
