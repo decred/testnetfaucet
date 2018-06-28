@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	flags "github.com/btcsuite/go-flags"
 	"github.com/decred/dcrd/dcrutil"
@@ -73,6 +74,9 @@ type config struct {
 	WithdrawalTimeLimit int64   `long:"withdrawaltimelimit" description:"Number of seconds before a second withdrawal can be made."`
 	WithdrawalAmount    float64 `long:"withdrawalamount" description:"Amount of testnet DCR to send with each request."`
 	Version             string
+
+	withdrawalAmount    dcrutil.Amount
+	withdrawalTimeLimit time.Duration
 }
 
 // serviceOptions defines the configuration options for the daemon as a service
@@ -428,19 +432,21 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	if cfg.WithdrawalAmount == 0 {
-		str := "%s: WithdrawalAmount cannot be 0"
-		err := fmt.Errorf(str, funcName)
+	cfg.withdrawalAmount, err = dcrutil.NewAmount(cfg.WithdrawalAmount)
+	if err != nil || cfg.withdrawalAmount <= 0 {
+		str := "%s: Invalid withdrawal amount: %v"
+		err := fmt.Errorf(str, funcName, cfg.WithdrawalAmount)
 		fmt.Fprintln(os.Stderr, err)
 		return nil, nil, err
 	}
 
-	if cfg.WithdrawalTimeLimit == 0 {
-		str := "%s: WithdrawalTimeLimit cannot be 0"
+	if cfg.WithdrawalTimeLimit <= 0 {
+		str := "%s: WithdrawalTimeLimit cannot be <= 0"
 		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
 		return nil, nil, err
 	}
+	cfg.withdrawalTimeLimit = time.Duration(cfg.WithdrawalTimeLimit) * time.Second
 
 	// Add default wallet port for the active network if there's no port specified
 	cfg.WalletHost = normalizeAddress(cfg.WalletHost, activeNetParams.WalletRPCServerPort)
