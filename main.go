@@ -154,7 +154,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := dcrwClient.SendToAddress(address, dcramount)
+	resp, err := dcrwClient.SendFromMinConf("default", address, dcramount, 0)
 	if err != nil {
 		log.Errorf("error sending %v to %v for %v: %v",
 			amount, address, hostIP, err)
@@ -292,7 +292,7 @@ func getClientIP(r *http.Request) (string, error) {
 
 func updateBalance(c *rpcclient.Client) {
 	// calculate balance
-	gbr, err := c.GetBalance("default")
+	gbr, err := c.GetBalanceMinConf("default", 0)
 	if err != nil {
 		log.Warnf("unable to update balance: %v", err)
 		return
