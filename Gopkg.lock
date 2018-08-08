@@ -58,6 +58,7 @@
     "chaincfg/chainec",
     "chaincfg/chainhash",
     "database",
+    "dcrec",
     "dcrec/edwards",
     "dcrec/secp256k1",
     "dcrec/secp256k1/schnorr",
@@ -69,7 +70,7 @@
     "txscript",
     "wire"
   ]
-  revision = "b730f985cab47dbe5c00a8ba26ebabda67ff01fb"
+  revision = "f0e65ec62f916b4b8aaafca6906c67c34c242dac"
 
 [[projects]]
   name = "github.com/decred/slog"
@@ -93,7 +94,7 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ripemd160"]
-  revision = "df8d4716b3472e4a531c33cedbe537dae921a1a9"
+  revision = "f027049dab0ad238e394a753dba2d14753473a04"
 
 [solve-meta]
   analyzer-name = "dep"

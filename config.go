@@ -40,7 +40,7 @@ var (
 	defaultConfigFile    = filepath.Join(testnetFaucetHomeDir, defaultConfigFilename)
 	defaultDataDir       = filepath.Join(testnetFaucetHomeDir, defaultDataDirname)
 	defaultLogDir        = filepath.Join(testnetFaucetHomeDir, defaultLogDirname)
-	defaultWalletAddress = "TsWjioPrP8E1TuTMmTrVMM2BA4iPrjQXBpR"
+	defaultWalletAddress = "TsfDLrRkk9ciUuwfp2b8PawwnukYD7yAjGd"
 )
 
 // runServiceCommand is only set to a real function on Windows.  It is used
@@ -345,7 +345,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Count number of network flags passed; assign active network params
 	// while we're at it
-	activeNetParams = &testNet2Params
+	activeNetParams = &testNet3Params
 
 	// Append the network type to the data directory so it is "namespaced"
 	// per network.  In addition to the block database, there are other
