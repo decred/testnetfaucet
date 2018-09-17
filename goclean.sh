@@ -13,6 +13,9 @@
 
 set -ex
 
+# run tests
+env GORACE="halt_on_error=1" go test -race ./...
+
 # Make sure gometalinter is installed and $GOPATH/bin is in your path.
 # $ go get -v github.com/alecthomas/gometalinter"
 # $ gometalinter --install"
@@ -20,14 +23,20 @@ if [ ! -x "$(type -p gometalinter)" ]; then
   exit 1
 fi
 
-# Automatic checks
-TESTDIRS=$(go list ./... | grep -v '/vendor/')
-test -z "$(gometalinter --vendor --disable-all \
---enable=gofmt \
---enable=golint \
---enable=vet \
---enable=gosimple \
---enable=unconvert \
---deadline=4m ./... 2>&1 | tee /dev/stderr)"
+# check linters
+# linters do not work with modules yet
+go mod vendor
+unset GO111MODULE
 
-env GORACE="halt_on_error=1" go test -race $TESTDIRS
+gometalinter --vendor --disable-all --deadline=10m \
+  --enable=gofmt \
+  --enable=golint \
+  --enable=vet \
+  --enable=gosimple \
+  --enable=unconvert \
+  --enable=ineffassign \
+  ./...
+if [ $? != 0 ]; then
+  echo 'gometalinter has some complaints'
+  exit 1
+fi
