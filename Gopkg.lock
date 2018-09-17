@@ -18,12 +18,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/btcsuite/btclog"
-  packages = ["."]
-  revision = "84c8d2346e9fc8c7b947e243b9c24e6df9fd206a"
-
-[[projects]]
-  branch = "master"
   name = "github.com/btcsuite/go-flags"
   packages = ["."]
   revision = "6c288d648c1cc1befcb90cb5511dcacf64ae8e61"
@@ -99,6 +93,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "85b5b976a7e07d3e61151d6afaa04b89fb3289ebdcab48f89e6f36ea078222f3"
+  inputs-digest = "6eecbac37ab6b968b597a9b38a7db008a6b2c76cb0d113333f91fdaee5becf31"
   solver-name = "gps-cdcl"
   solver-version = 1
