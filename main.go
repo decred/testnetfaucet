@@ -27,15 +27,15 @@ var (
 )
 
 // Balance and limits
-var lastBalance float64
-var transactionLimit float64
+var lastBalance dcrutil.Amount
+var transactionLimit dcrutil.Amount
 
 // Daemon Params to use
 var dcrwClient *rpcclient.Client
 
 // Map of received IP requests for funds.
-var requestAmounts map[int64]float64
-var requestIPs map[string]int64
+var requestAmounts map[time.Time]dcrutil.Amount
+var requestIPs map[string]time.Time
 
 type jsonResponse struct {
 	Txid  string
@@ -45,13 +45,13 @@ type jsonResponse struct {
 // Overall Data structure given to the template to render
 type testnetFaucetInfo struct {
 	Address          string
-	Amount           float64
+	Amount           dcrutil.Amount
 	BlockHeight      int64
-	Balance          float64
-	TransactionLimit float64
+	Balance          dcrutil.Amount
+	TransactionLimit dcrutil.Amount
 	Error            error
-	TimeLimit        int64
-	SentToday        float64
+	TimeLimit        time.Duration
+	SentToday        dcrutil.Amount
 	Success          string
 }
 
@@ -61,10 +61,10 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	amountSentToday := calculateAmountSentToday()
 	testnetFaucetInformation := &testnetFaucetInfo{
 		Address:          cfg.WalletAddress,
-		Amount:           cfg.WithdrawalAmount,
+		Amount:           cfg.withdrawalAmount,
 		Balance:          lastBalance,
 		TransactionLimit: transactionLimit,
-		TimeLimit:        cfg.WithdrawalTimeLimit,
+		TimeLimit:        cfg.withdrawalTimeLimit,
 		SentToday:        amountSentToday,
 	}
 
@@ -88,8 +88,8 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	amount := cfg.withdrawalAmount
 	addressInput := r.FormValue("address")
-	amount := cfg.WithdrawalAmount
 	amountInput := r.FormValue("amount")
 	overridetokenInput := r.FormValue("overridetoken")
 
@@ -97,8 +97,8 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	if overridetokenInput != cfg.OverrideToken {
 		lastRequestTime, found := requestIPs[hostIP]
 		if found {
-			nextAllowedRequest := lastRequestTime + cfg.WithdrawalTimeLimit
-			coolDownTime := nextAllowedRequest - time.Now().Unix()
+			nextAllowedRequest := lastRequestTime.Add(cfg.withdrawalTimeLimit)
+			coolDownTime := time.Until(nextAllowedRequest)
 
 			if coolDownTime >= 0 {
 				err = fmt.Errorf("You may only withdraw %v DCR every "+
@@ -112,9 +112,15 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 
 	// check amount if specified
 	if amountInput != "" {
-		amount, err = strconv.ParseFloat(amountInput, 32)
+		amountFloat, err := strconv.ParseFloat(amountInput, 32)
 		if err != nil {
 			err = fmt.Errorf("amount invalid: %v", err)
+			sendReply(w, r, tmpl, testnetFaucetInformation, err)
+			return
+		}
+		amount, err = dcrutil.NewAmount(amountFloat)
+		if err != nil {
+			err = fmt.Errorf("NewAmount failed: %v", err)
 			sendReply(w, r, tmpl, testnetFaucetInformation, err)
 			return
 		}
@@ -148,13 +154,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dcramount, err := dcrutil.NewAmount(amount)
-	if err != nil {
-		sendReply(w, r, tmpl, testnetFaucetInformation, err)
-		return
-	}
-
-	resp, err := dcrwClient.SendFromMinConf("default", address, dcramount, 0)
+	resp, err := dcrwClient.SendFromMinConf("default", address, amount, 0)
 	if err != nil {
 		log.Errorf("error sending %v to %v for %v: %v",
 			amount, address, hostIP, err)
@@ -164,8 +164,8 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 
 	testnetFaucetInformation.Success = resp.String()
 	testnetFaucetInformation.SentToday = testnetFaucetInformation.SentToday + amount
-	requestAmounts[time.Now().Unix()] = amount
-	requestIPs[hostIP] = time.Now().Unix()
+	requestAmounts[time.Now()] = amount
+	requestIPs[hostIP] = time.Now()
 	log.Infof("successfully sent %v to %v for %v",
 		amount, address, hostIP)
 	updateBalance(dcrwClient)
@@ -174,16 +174,16 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	sendReply(w, r, tmpl, testnetFaucetInformation, nil)
 }
 
-func calculateAmountSentToday() float64 {
-	amountToday := float64(0)
+func calculateAmountSentToday() dcrutil.Amount {
+	var amountToday dcrutil.Amount
 
+	now := time.Now()
 	for then, amount := range requestAmounts {
-		now := time.Now().Unix()
-		if now-then >= 24*60*60 {
+		if now.Sub(then) >= time.Hour*24 {
 			continue
 		}
 
-		amountToday = amountToday + amount
+		amountToday += amount
 	}
 
 	return amountToday
@@ -200,8 +200,8 @@ func main() {
 	cfg = loadedCfg
 
 	quit := make(chan struct{})
-	requestAmounts = make(map[int64]float64)
-	requestIPs = make(map[string]int64)
+	requestAmounts = make(map[time.Time]dcrutil.Amount)
+	requestIPs = make(map[string]time.Time)
 
 	dcrwCerts, err := ioutil.ReadFile(cfg.WalletCert)
 	if err != nil {
@@ -298,9 +298,14 @@ func updateBalance(c *rpcclient.Client) {
 		return
 	}
 
-	spendable := float64(0)
-	for _, v := range gbr.Balances {
-		spendable = v.Spendable + spendable
+	var spendable dcrutil.Amount
+	for _, balance := range gbr.Balances {
+		bal, err := dcrutil.NewAmount(balance.Spendable)
+		if err != nil {
+			log.Warnf("NewAmount error: %v", err)
+			continue
+		}
+		spendable += bal
 	}
 
 	log.Infof("updating balance from %v to %v", lastBalance, spendable)
