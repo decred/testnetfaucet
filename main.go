@@ -20,6 +20,8 @@ import (
 
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/rpcclient"
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
 )
 
 var (
@@ -56,7 +58,6 @@ type testnetFaucetInfo struct {
 }
 
 func requestFunds(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fp := filepath.Join("public/views", "design_sketch.html")
 	amountSentToday := calculateAmountSentToday()
 	testnetFaucetInformation := &testnetFaucetInfo{
@@ -237,16 +238,23 @@ func main() {
 	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("public/css/"))))
 	http.Handle("/fonts/", http.StripPrefix("/fonts/", http.FileServer(http.Dir("public/fonts/"))))
 	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("public/images/"))))
-	http.HandleFunc("/", requestFunds)
-	err = http.ListenAndServe(cfg.Listen, nil)
+
+	// CORS options
+	origins := handlers.AllowedOrigins([]string{"*"})
+	methods := handlers.AllowedMethods([]string{"GET", "OPTIONS", "POST"})
+	headers := handlers.AllowedHeaders([]string{"Content-Type"})
+
+	r := mux.NewRouter()
+	r.HandleFunc("/", requestFunds)
+
+	err = http.ListenAndServe(cfg.Listen,
+		handlers.CORS(origins, methods, headers)(r))
 	if err != nil {
 		log.Errorf("Failed to bind http server: %s", err.Error())
 	}
 }
 
 func sendReply(w http.ResponseWriter, r *http.Request, tmpl *template.Template, info *testnetFaucetInfo, err error) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
 	jsonResp := &jsonResponse{}
 	if err != nil {
 		info.Error = err
