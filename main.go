@@ -38,8 +38,8 @@ var requestAmounts map[time.Time]dcrutil.Amount
 var requestIPs map[string]time.Time
 
 type jsonResponse struct {
-	Txid  string
-	Error string
+	TxID  string `json:"txid"`
+	Error string `json:"error"`
 }
 
 // Overall Data structure given to the template to render
@@ -251,10 +251,10 @@ func sendReply(w http.ResponseWriter, r *http.Request, tmpl *template.Template, 
 	if err != nil {
 		info.Error = err
 		jsonResp.Error = err.Error()
-		jsonResp.Txid = ""
+		jsonResp.TxID = ""
 	} else {
 		jsonResp.Error = ""
-		jsonResp.Txid = info.Success
+		jsonResp.TxID = info.Success
 	}
 	json, _ := json.Marshal(jsonResp)
 
