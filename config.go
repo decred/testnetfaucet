@@ -27,7 +27,6 @@ const (
 	defaultLogLevel              = "info"
 	defaultLogDirname            = "logs"
 	defaultLogFilename           = "testnetfaucet.log"
-	defaultCookieSecure          = false
 	defaultListen                = ":8000"
 	defaultPublicPath            = "public"
 	defaultTemplatePath          = "views"
