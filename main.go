@@ -1,4 +1,4 @@
-// Copyright (c) 2017 The Decred developers
+// Copyright (c) 2017-2019 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -58,6 +58,11 @@ type testnetFaucetInfo struct {
 }
 
 func requestFunds(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-XSS-Protection", "1; mode=block")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+
 	fp := filepath.Join("public/views", "design_sketch.html")
 	amountSentToday := calculateAmountSentToday()
 	testnetFaucetInformation := &testnetFaucetInfo{
