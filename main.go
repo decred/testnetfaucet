@@ -94,7 +94,13 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	amount := cfg.withdrawalAmount
+	var amount dcrutil.Amount
+	if cfg.withdrawalAmount > transactionLimit {
+		amount = transactionLimit
+	} else {
+		amount = cfg.withdrawalAmount
+	}
+
 	addressInput := r.FormValue("address")
 	amountInput := r.FormValue("amount")
 	overridetokenInput := r.FormValue("overridetoken")
