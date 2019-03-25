@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"net"
@@ -25,19 +26,20 @@ import (
 )
 
 var (
+	// Configuration
 	cfg *config
+
+	// Daemon Params to use
+	dcrwClient *rpcclient.Client
+
+	amountMtx        sync.RWMutex
+	lastBalance      dcrutil.Amount
+	transactionLimit dcrutil.Amount
+
+	requestMtx     sync.RWMutex
+	requestAmounts map[time.Time]dcrutil.Amount
+	requestIPs     map[string]time.Time
 )
-
-// Balance and limits
-var lastBalance dcrutil.Amount
-var transactionLimit dcrutil.Amount
-
-// Daemon Params to use
-var dcrwClient *rpcclient.Client
-
-// Map of received IP requests for funds.
-var requestAmounts map[time.Time]dcrutil.Amount
-var requestIPs map[string]time.Time
 
 type jsonResponse struct {
 	TxID  string `json:"txid"`
@@ -63,13 +65,18 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 
+	amountMtx.RLock()
+	balance := lastBalance
+	tLimit := transactionLimit
+	amountMtx.RUnlock()
+
 	fp := filepath.Join("public/views", "design_sketch.html")
 	amountSentToday := calculateAmountSentToday()
 	testnetFaucetInformation := &testnetFaucetInfo{
 		Address:          cfg.WalletAddress,
 		Amount:           cfg.withdrawalAmount,
-		Balance:          lastBalance,
-		TransactionLimit: transactionLimit,
+		Balance:          balance,
+		TransactionLimit: tLimit,
 		TimeLimit:        cfg.withdrawalTimeLimit,
 		SentToday:        amountSentToday,
 	}
@@ -94,14 +101,22 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	amount := cfg.withdrawalAmount
+	var amount dcrutil.Amount
+	if cfg.withdrawalAmount > tLimit {
+		amount = tLimit
+	} else {
+		amount = cfg.withdrawalAmount
+	}
+
 	addressInput := r.FormValue("address")
 	amountInput := r.FormValue("amount")
 	overridetokenInput := r.FormValue("overridetoken")
 
 	// enforce ratelimit unless overridetoken was specified and matches
 	if overridetokenInput != cfg.OverrideToken {
+		requestMtx.RLock()
 		lastRequestTime, found := requestIPs[hostIP]
+		requestMtx.RUnlock()
 		if found {
 			nextAllowedRequest := lastRequestTime.Add(cfg.withdrawalTimeLimit)
 			coolDownTime := time.Until(nextAllowedRequest)
@@ -139,7 +154,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// enforce the transaction limit unconditionally
-	if amount > transactionLimit {
+	if amount > tLimit {
 		err = errors.New("amount exceeds limit")
 		sendReply(w, r, tmpl, testnetFaucetInformation, err)
 		return
@@ -170,17 +185,22 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 
 	testnetFaucetInformation.Success = resp.String()
 	testnetFaucetInformation.SentToday = testnetFaucetInformation.SentToday + amount
+	requestMtx.Lock()
 	requestAmounts[time.Now()] = amount
 	requestIPs[hostIP] = time.Now()
+	requestMtx.Unlock()
 	log.Infof("successfully sent %v to %v for %v",
 		amount, address, hostIP)
 	updateBalance(dcrwClient)
-	testnetFaucetInformation.TransactionLimit = transactionLimit
+	testnetFaucetInformation.TransactionLimit = tLimit
 
 	sendReply(w, r, tmpl, testnetFaucetInformation, nil)
 }
 
 func calculateAmountSentToday() dcrutil.Amount {
+	defer requestMtx.RUnlock()
+	requestMtx.Lock()
+
 	var amountToday dcrutil.Amount
 
 	now := time.Now()
@@ -321,8 +341,10 @@ func updateBalance(c *rpcclient.Client) {
 		spendable += bal
 	}
 
+	amountMtx.Lock()
 	log.Infof("updating balance from %v to %v", lastBalance, spendable)
 	lastBalance = spendable
 	transactionLimit = spendable / 100
 	log.Infof("updating transaction limit to %v", transactionLimit)
+	amountMtx.Unlock()
 }
