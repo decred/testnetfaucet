@@ -259,10 +259,6 @@ func main() {
 		dcrwClient.Disconnect()
 		os.Exit(1)
 	}()
-	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("public/js/"))))
-	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("public/css/"))))
-	http.Handle("/fonts/", http.StripPrefix("/fonts/", http.FileServer(http.Dir("public/fonts/"))))
-	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("public/images/"))))
 
 	// CORS options
 	origins := handlers.AllowedOrigins([]string{"*"})
@@ -270,6 +266,12 @@ func main() {
 	headers := handlers.AllowedHeaders([]string{"Content-Type"})
 
 	r := mux.NewRouter()
+
+	r.PathPrefix("/js/").Handler(http.StripPrefix("/js/", http.FileServer(http.Dir("public/js"))))
+	r.PathPrefix("/css/").Handler(http.StripPrefix("/css/", http.FileServer(http.Dir("public/css"))))
+	r.PathPrefix("/fonts/").Handler(http.StripPrefix("/fonts/", http.FileServer(http.Dir("public/fonts"))))
+	r.PathPrefix("/images/").Handler(http.StripPrefix("/images/", http.FileServer(http.Dir("public/images"))))
+
 	r.HandleFunc("/", requestFunds)
 
 	err = http.ListenAndServe(cfg.Listen,
