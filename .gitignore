@@ -1,3 +1,5 @@
 testnetfaucet
 *~
 vendor/
+.vscode/launch.json
+debug
