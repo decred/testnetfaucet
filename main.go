@@ -199,7 +199,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 
 func calculateAmountSentToday() dcrutil.Amount {
 	defer requestMtx.RUnlock()
-	requestMtx.Lock()
+	requestMtx.RLock()
 
 	var amountToday dcrutil.Amount
 
