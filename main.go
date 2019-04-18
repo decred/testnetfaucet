@@ -255,22 +255,27 @@ func main() {
 
 	go func() {
 		<-quit
-		log.Info("Closing testnet demo.")
+		log.Info("Closing testnetfaucet.")
 		dcrwClient.Disconnect()
 		os.Exit(1)
 	}()
-	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("public/js/"))))
-	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("public/css/"))))
-	http.Handle("/fonts/", http.StripPrefix("/fonts/", http.FileServer(http.Dir("public/fonts/"))))
-	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("public/images/"))))
+
+	r := mux.NewRouter()
+
+	r.PathPrefix("/js/").Handler(http.StripPrefix("/js/", http.FileServer(http.Dir("public/js"))))
+	r.PathPrefix("/css/").Handler(http.StripPrefix("/css/", http.FileServer(http.Dir("public/css"))))
+	r.PathPrefix("/fonts/").Handler(http.StripPrefix("/fonts/", http.FileServer(http.Dir("public/fonts"))))
+	r.PathPrefix("/images/").Handler(http.StripPrefix("/images/", http.FileServer(http.Dir("public/images"))))
+
+	// The /requestfaucet endpoint is used by Pi and CMS
+	r.HandleFunc("/requestfaucet", requestFunds)
+
+	r.HandleFunc("/", requestFunds)
 
 	// CORS options
 	origins := handlers.AllowedOrigins([]string{"*"})
 	methods := handlers.AllowedMethods([]string{"GET", "OPTIONS", "POST"})
 	headers := handlers.AllowedHeaders([]string{"Content-Type"})
-
-	r := mux.NewRouter()
-	r.HandleFunc("/", requestFunds)
 
 	err = http.ListenAndServe(cfg.Listen,
 		handlers.CORS(origins, methods, headers)(r))

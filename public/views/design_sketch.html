@@ -34,7 +34,7 @@
     <nav class="navbar navbar-default navbar-fixed-top">
       <div class="container">
         <div class="navbar-header">
-          <a class="navbar-brand" href="#">
+          <a class="navbar-brand" href="/">
             <svg class="svg-logo">
               <use xlink:href="/images/sprites.svg#svg-decred-logo" />
             </svg>
@@ -69,11 +69,11 @@
           {{end}}
           {{if .Success}}
           <div class="alert alert-success">
-            <p>Success! Transaction {{.Success}} has been sent.  You may see it on <a href="https://testnet.dcrdata.org/explorer/tx/{{.Success}}">dcrdata</a> or <a href="https://testnet.decred.org/tx/{{.Success}}">Insight</a>.</p>
+            <p>Success! Transaction {{.Success}} has been sent.  You may see it on <a href="https://testnet.dcrdata.org/explorer/tx/{{.Success}}">dcrdata</a>.</p>
           </div>
           {{end}}
 	        <!-- FORM BEGINS HERE -->
-          <form action="/requestfaucet" class="form-horizontal" method="post">
+          <form class="form-horizontal" method="post">
 	          <div class="form-group">
               <input class="form-control input-md" type="text" name="address" placeholder="Address" required>
               <input type="hidden" name="amount">
