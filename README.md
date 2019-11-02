@@ -1,4 +1,10 @@
-# testnetfaucet
+testnetfaucet
+=============
+
+[![Build Status](https://github.com/decred/testnetfaucet/workflows/Build%20and%20Test/badge.svg)](https://github.com/decred/testnetfaucet/actions)
+[![ISC License](https://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+
+## Overview
 
 testnetfaucet is a simple web app that sends a configurable amount of testnet
 Decred via an rpcclient connection to an instance of dcrwallet.
@@ -30,12 +36,7 @@ testnetfaucet
 
 ## Contact
 
-If you have any further questions you can find us at:
-
-- irc.freenode.net (channel #decred)
-- [webchat](https://webchat.freenode.net/?channels=decred)
-- forum.decred.org
-- decred.slack.com
+Check with the [community](https://decred.org/community/).
 
 ## Issue Tracker
 
