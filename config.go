@@ -30,6 +30,7 @@ const (
 	defaultListen                = ":8000"
 	defaultPublicPath            = "public"
 	defaultTemplatePath          = "views"
+	defaultWalletAccount         = "default"
 	defaultWallertCert           = "~/.dcrwallet/rpc.cert"
 	defaultWithdrawalAmount      = 2
 	defaultWithdrawalTimeSeconds = 30
@@ -65,6 +66,7 @@ type config struct {
 	OverrideToken       string  `long:"overridetoken" description:"Secret override token to skip time check."`
 	PublicPath          string  `long:"publicpath" description:"Path to the public folder which contains css/fonts/images/javascript."`
 	TemplatePath        string  `long:"templatepath" description:"Path to the views folder which contains html files."`
+	WalletAccount       string  `long:"walletaccount" description:"Account to send funds from."`
 	WalletAddress       string  `long:"walletaddress" description:"Wallet address for returning coins."`
 	WalletHost          string  `long:"wallethost" description:"Hostname for wallet server."`
 	WalletUser          string  `long:"walletuser" description:"Username for wallet server."`
@@ -255,6 +257,7 @@ func loadConfig() (*config, []string, error) {
 		DataDir:             defaultDataDir,
 		LogDir:              defaultLogDir,
 		Listen:              defaultListen,
+		WalletAccount:       defaultWalletAccount,
 		WalletAddress:       defaultWalletAddress,
 		WalletCert:          defaultWallertCert,
 		WithdrawalAmount:    defaultWithdrawalAmount,
