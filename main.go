@@ -304,13 +304,13 @@ func sendReply(w http.ResponseWriter, r *http.Request, tmpl *template.Template, 
 	}
 }
 
-// Get the client's real IP address using the X-Real-IP header, or if that is
+// Get the client's real IP address using the X-Forwarded-For header, or if that is
 // empty, http.Request.RemoteAddr. See the sample nginx.conf for using the
-// real_ip module to correctly set the X-Real-IP header.
+// real_ip module to correctly set the X-Forwarded-For header.
 func getClientIP(r *http.Request) (string, error) {
-	xRealIP := r.Header.Get("X-Real-IP")
+	xRealIP := r.Header.Get("X-Forwarded-For")
 	if len(xRealIP) == 0 {
-		log.Warn(`"X-Real-IP" header invalid, using RemoteAddr instead`)
+		log.Warn(`"X-Forwarded-For" header invalid, using RemoteAddr instead`)
 		host, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
 			return "", err
