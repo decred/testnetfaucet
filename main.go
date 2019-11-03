@@ -19,8 +19,8 @@ import (
 
 	"net"
 
-	"github.com/decred/dcrd/dcrutil"
-	"github.com/decred/dcrd/rpcclient"
+	"github.com/decred/dcrd/dcrutil/v2"
+	"github.com/decred/dcrd/rpcclient/v5"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
@@ -161,16 +161,9 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decode address and amount and send transaction.
-	address, err := dcrutil.DecodeAddress(addressInput)
+	address, err := dcrutil.DecodeAddress(addressInput, activeNetParams.Params)
 	if err != nil {
 		log.Errorf("ip %v submitted bad address %v", hostIP, addressInput)
-		sendReply(w, r, tmpl, testnetFaucetInformation, err)
-		return
-	}
-
-	if !address.IsForNet(activeNetParams.Params) {
-		err = fmt.Errorf("address "+
-			"%s is not for %s", address, activeNetParams.Name)
 		sendReply(w, r, tmpl, testnetFaucetInformation, err)
 		return
 	}
