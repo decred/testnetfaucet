@@ -88,6 +88,9 @@ func index(w http.ResponseWriter, r *http.Request) {
 // requestFunds is the handler for HTTP POST requests to "/requestfaucet".
 func requestFunds(w http.ResponseWriter, r *http.Request) {
 
+	requestMtx.Lock()
+	defer requestMtx.Unlock()
+
 	amountMtx.RLock()
 	balance := lastBalance
 	tLimit := transactionLimit
@@ -132,14 +135,13 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 
 	// enforce ratelimit unless overridetoken was specified and matches
 	if overridetokenInput != cfg.OverrideToken {
-		requestMtx.RLock()
 		lastRequestTime, found := requestIPs[hostIP]
-		requestMtx.RUnlock()
 		if found {
 			nextAllowedRequest := lastRequestTime.Add(cfg.withdrawalTimeLimit)
 			coolDownTime := time.Until(nextAllowedRequest)
 
 			if coolDownTime >= 0 {
+				log.Debugf("client exceeded rate limit(ip: %s, address: %s)", hostIP, addressInput)
 				err = fmt.Errorf("You may only withdraw %v DCR every "+
 					"%v seconds.  Please wait another %d seconds.",
 					cfg.WithdrawalAmount, cfg.WithdrawalTimeLimit, int(coolDownTime.Seconds()))
@@ -196,10 +198,8 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 
 	testnetFaucetInformation.Success = resp.String()
 	testnetFaucetInformation.SentToday = testnetFaucetInformation.SentToday + amount
-	requestMtx.Lock()
 	requestAmounts[time.Now()] = amount
 	requestIPs[hostIP] = time.Now()
-	requestMtx.Unlock()
 	log.Infof("successfully sent %v to %v for %v",
 		amount, address, hostIP)
 	updateBalance(dcrwClient)
