@@ -59,18 +59,13 @@ type testnetFaucetInfo struct {
 	Success          string
 }
 
-func requestFunds(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("X-Frame-Options", "DENY")
-	w.Header().Set("X-XSS-Protection", "1; mode=block")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Referrer-Policy", "no-referrer")
-
+// index is the handler for HTTP GET requests to "/".
+func index(w http.ResponseWriter, r *http.Request) {
 	amountMtx.RLock()
 	balance := lastBalance
 	tLimit := transactionLimit
 	amountMtx.RUnlock()
 
-	fp := filepath.Join("public/views", "design_sketch.html")
 	amountSentToday := calculateAmountSentToday()
 	testnetFaucetInformation := &testnetFaucetInfo{
 		Address:          cfg.WalletAddress,
@@ -81,6 +76,34 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 		SentToday:        amountSentToday,
 	}
 
+	fp := filepath.Join("public/views", "design_sketch.html")
+	tmpl, err := template.New("home").ParseFiles(fp)
+	if err != nil {
+		panic(err)
+	}
+
+	sendReply(w, r, tmpl, testnetFaucetInformation, nil)
+}
+
+// requestFunds is the handler for HTTP POST requests to "/requestfaucet".
+func requestFunds(w http.ResponseWriter, r *http.Request) {
+
+	amountMtx.RLock()
+	balance := lastBalance
+	tLimit := transactionLimit
+	amountMtx.RUnlock()
+
+	amountSentToday := calculateAmountSentToday()
+	testnetFaucetInformation := &testnetFaucetInfo{
+		Address:          cfg.WalletAddress,
+		Amount:           cfg.withdrawalAmount,
+		Balance:          balance,
+		TransactionLimit: tLimit,
+		TimeLimit:        cfg.withdrawalTimeLimit,
+		SentToday:        amountSentToday,
+	}
+
+	fp := filepath.Join("public/views", "design_sketch.html")
 	tmpl, err := template.New("home").ParseFiles(fp)
 	if err != nil {
 		panic(err)
@@ -89,11 +112,6 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	hostIP, err := getClientIP(r)
 	if err != nil {
 		panic(err)
-	}
-
-	if r.Method == "GET" {
-		sendReply(w, r, tmpl, testnetFaucetInformation, nil)
-		return
 	}
 
 	if err := r.ParseForm(); err != nil {
@@ -123,8 +141,8 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 
 			if coolDownTime >= 0 {
 				err = fmt.Errorf("You may only withdraw %v DCR every "+
-					"%v seconds.  Please wait another %v seconds.",
-					cfg.WithdrawalAmount, cfg.WithdrawalTimeLimit, coolDownTime)
+					"%v seconds.  Please wait another %d seconds.",
+					cfg.WithdrawalAmount, cfg.WithdrawalTimeLimit, int(coolDownTime.Seconds()))
 				sendReply(w, r, tmpl, testnetFaucetInformation, err)
 				return
 			}
@@ -261,9 +279,8 @@ func main() {
 	r.PathPrefix("/images/").Handler(http.StripPrefix("/images/", http.FileServer(http.Dir("public/images"))))
 
 	// The /requestfaucet endpoint is used by Pi and CMS
-	r.HandleFunc("/requestfaucet", requestFunds)
-
-	r.HandleFunc("/", requestFunds)
+	r.HandleFunc("/requestfaucet", requestFunds).Methods("POST")
+	r.HandleFunc("/", index).Methods("GET")
 
 	// CORS options
 	origins := handlers.AllowedOrigins([]string{"*"})
@@ -278,6 +295,11 @@ func main() {
 }
 
 func sendReply(w http.ResponseWriter, r *http.Request, tmpl *template.Template, info *testnetFaucetInfo, err error) {
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-XSS-Protection", "1; mode=block")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+
 	jsonResp := &jsonResponse{}
 	if err != nil {
 		info.Error = err
