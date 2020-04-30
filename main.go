@@ -53,7 +53,7 @@ type testnetFaucetInfo struct {
 	BlockHeight      int64
 	Balance          dcrutil.Amount
 	TransactionLimit dcrutil.Amount
-	Error            error
+	Error            string
 	TimeLimit        time.Duration
 	SentToday        dcrutil.Amount
 	Success          string
@@ -61,66 +61,45 @@ type testnetFaucetInfo struct {
 
 // index is the handler for HTTP GET requests to "/".
 func index(w http.ResponseWriter, r *http.Request) {
-	amountMtx.RLock()
-	balance := lastBalance
-	tLimit := transactionLimit
-	amountMtx.RUnlock()
-
-	amountSentToday := calculateAmountSentToday()
-	testnetFaucetInformation := &testnetFaucetInfo{
-		Address:          cfg.WalletAddress,
-		Amount:           cfg.withdrawalAmount,
-		Balance:          balance,
-		TransactionLimit: tLimit,
-		TimeLimit:        cfg.withdrawalTimeLimit,
-		SentToday:        amountSentToday,
-	}
-
-	fp := filepath.Join("public/views", "design_sketch.html")
-	tmpl, err := template.New("home").ParseFiles(fp)
-	if err != nil {
-		panic(err)
-	}
-
-	sendReply(w, r, tmpl, testnetFaucetInformation, nil)
+	sendReply(w, r, "", "")
 }
 
 // requestFunds is the handler for HTTP POST requests to "/requestfaucet".
 func requestFunds(w http.ResponseWriter, r *http.Request) {
-
-	requestMtx.Lock()
-	defer requestMtx.Unlock()
-
-	amountMtx.RLock()
-	balance := lastBalance
-	tLimit := transactionLimit
-	amountMtx.RUnlock()
-
-	amountSentToday := calculateAmountSentToday()
-	testnetFaucetInformation := &testnetFaucetInfo{
-		Address:          cfg.WalletAddress,
-		Amount:           cfg.withdrawalAmount,
-		Balance:          balance,
-		TransactionLimit: tLimit,
-		TimeLimit:        cfg.withdrawalTimeLimit,
-		SentToday:        amountSentToday,
-	}
-
-	fp := filepath.Join("public/views", "design_sketch.html")
-	tmpl, err := template.New("home").ParseFiles(fp)
-	if err != nil {
-		panic(err)
-	}
-
 	hostIP, err := getClientIP(r)
 	if err != nil {
 		panic(err)
 	}
 
 	if err := r.ParseForm(); err != nil {
-		sendReply(w, r, tmpl, testnetFaucetInformation, err)
+		sendReply(w, r, "", err.Error())
 		return
 	}
+
+	addressInput := r.FormValue("address")
+	amountInput := r.FormValue("amount")
+	overridetokenInput := r.FormValue("overridetoken")
+
+	resp, err := pay(hostIP, addressInput, amountInput, overridetokenInput)
+	if err != nil {
+		sendReply(w, r, "", err.Error())
+		return
+	}
+	sendReply(w, r, resp, "")
+}
+
+// pay uses the provided request parameters to process a faucet payment. It will
+// return an error if parameters are invalid or if the client has exceeded the
+// rate limit. Note: requestMtx is used to ensure only one pay function can run
+// at a time.
+func pay(hostIP, addressInput, amountInput, overridetokenInput string) (string, error) {
+	// Ensure only one pay function request can run at a time.
+	requestMtx.Lock()
+	defer requestMtx.Unlock()
+
+	amountMtx.RLock()
+	tLimit := transactionLimit
+	amountMtx.RUnlock()
 
 	var amount dcrutil.Amount
 	if cfg.withdrawalAmount > tLimit {
@@ -128,10 +107,6 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	} else {
 		amount = cfg.withdrawalAmount
 	}
-
-	addressInput := r.FormValue("address")
-	amountInput := r.FormValue("amount")
-	overridetokenInput := r.FormValue("overridetoken")
 
 	// enforce ratelimit unless overridetoken was specified and matches
 	if overridetokenInput != cfg.OverrideToken {
@@ -142,11 +117,9 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 
 			if coolDownTime >= 0 {
 				log.Debugf("client exceeded rate limit(ip: %s, address: %s)", hostIP, addressInput)
-				err = fmt.Errorf("You may only withdraw %v DCR every "+
+				return "", fmt.Errorf("You may only withdraw %v DCR every "+
 					"%v seconds.  Please wait another %d seconds.",
 					cfg.WithdrawalAmount, cfg.WithdrawalTimeLimit, int(coolDownTime.Seconds()))
-				sendReply(w, r, tmpl, testnetFaucetInformation, err)
-				return
 			}
 		}
 	}
@@ -155,57 +128,45 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	if amountInput != "" {
 		amountFloat, err := strconv.ParseFloat(amountInput, 32)
 		if err != nil {
-			err = fmt.Errorf("amount invalid: %v", err)
-			sendReply(w, r, tmpl, testnetFaucetInformation, err)
-			return
+			return "", fmt.Errorf("amount invalid: %v", err)
+
 		}
 		amount, err = dcrutil.NewAmount(amountFloat)
 		if err != nil {
-			err = fmt.Errorf("NewAmount failed: %v", err)
-			sendReply(w, r, tmpl, testnetFaucetInformation, err)
-			return
+			return "", fmt.Errorf("NewAmount failed: %v", err)
 		}
 	}
 
 	if amount <= 0 {
-		err = errors.New("amount must be greater than 0")
-		sendReply(w, r, tmpl, testnetFaucetInformation, err)
-		return
+		return "", errors.New("amount must be greater than 0")
 	}
 
 	// enforce the transaction limit unconditionally
 	if amount > tLimit {
-		err = errors.New("amount exceeds limit")
-		sendReply(w, r, tmpl, testnetFaucetInformation, err)
-		return
+		return "", errors.New("amount exceeds limit")
 	}
 
 	// Decode address and amount and send transaction.
 	address, err := dcrutil.DecodeAddress(addressInput, activeNetParams.Params)
 	if err != nil {
 		log.Errorf("ip %v submitted bad address %v", hostIP, addressInput)
-		sendReply(w, r, tmpl, testnetFaucetInformation, err)
-		return
+		return "", err
 	}
 
 	resp, err := dcrwClient.SendFromMinConf(cfg.WalletAccount, address, amount, 0)
 	if err != nil {
 		log.Errorf("error sending %v to %v for %v: %v",
 			amount, address, hostIP, err)
-		sendReply(w, r, tmpl, testnetFaucetInformation, err)
-		return
+		return "", err
 	}
 
-	testnetFaucetInformation.Success = resp.String()
-	testnetFaucetInformation.SentToday = testnetFaucetInformation.SentToday + amount
 	requestAmounts[time.Now()] = amount
 	requestIPs[hostIP] = time.Now()
 	log.Infof("successfully sent %v to %v for %v",
 		amount, address, hostIP)
 	updateBalance(dcrwClient)
-	testnetFaucetInformation.TransactionLimit = tLimit
 
-	sendReply(w, r, tmpl, testnetFaucetInformation, nil)
+	return resp.String(), nil
 }
 
 func calculateAmountSentToday() dcrutil.Amount {
@@ -294,20 +255,15 @@ func main() {
 	}
 }
 
-func sendReply(w http.ResponseWriter, r *http.Request, tmpl *template.Template, info *testnetFaucetInfo, err error) {
+func sendReply(w http.ResponseWriter, r *http.Request, successMsg string, errMsg string) {
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 
-	jsonResp := &jsonResponse{}
-	if err != nil {
-		info.Error = err
-		jsonResp.Error = err.Error()
-		jsonResp.TxID = ""
-	} else {
-		jsonResp.Error = ""
-		jsonResp.TxID = info.Success
+	jsonResp := &jsonResponse{
+		Error: errMsg,
+		TxID:  successMsg,
 	}
 	json, _ := json.Marshal(jsonResp)
 
@@ -317,6 +273,29 @@ func sendReply(w http.ResponseWriter, r *http.Request, tmpl *template.Template, 
 		w.WriteHeader(http.StatusOK)
 		w.Write(json)
 		return
+	}
+
+	// Otherwise prepare and return template
+	amountMtx.RLock()
+	balance := lastBalance
+	tLimit := transactionLimit
+	amountMtx.RUnlock()
+
+	info := &testnetFaucetInfo{
+		Address:          cfg.WalletAddress,
+		Amount:           cfg.withdrawalAmount,
+		Balance:          balance,
+		TransactionLimit: tLimit,
+		TimeLimit:        cfg.withdrawalTimeLimit,
+		SentToday:        calculateAmountSentToday(),
+		Success:          successMsg,
+		Error:            errMsg,
+	}
+
+	fp := filepath.Join("public/views", "design_sketch.html")
+	tmpl, err := template.New("home").ParseFiles(fp)
+	if err != nil {
+		panic(err)
 	}
 
 	w.Header().Set("X-Json-Reply", string(json))
