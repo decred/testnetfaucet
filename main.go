@@ -206,11 +206,11 @@ func main() {
 
 	dcrwCerts, err := ioutil.ReadFile(cfg.WalletCert)
 	if err != nil {
-		log.Errorf("Failed to read dcrd cert file at %s: %s", cfg.WalletCert,
+		log.Errorf("Failed to read dcrwallet cert file at %s: %s", cfg.WalletCert,
 			err.Error())
 		os.Exit(1)
 	}
-	log.Infof("Attempting to connect to dcrd RPC %s as user %s "+
+	log.Infof("Attempting to connect to dcrwallet RPC %s as user %s "+
 		"using certificate located in %s",
 		cfg.WalletHost, cfg.WalletUser, cfg.WalletCert)
 	connCfgDaemon := &rpcclient.ConnConfig{
@@ -223,7 +223,7 @@ func main() {
 	}
 	rpcClient, err := rpcclient.New(connCfgDaemon, nil)
 	if err != nil {
-		log.Errorf("Failed to start dcrd rpcclient: %s", err.Error())
+		log.Errorf("Failed to start dcrwallet rpcclient: %s", err.Error())
 		os.Exit(1)
 	}
 	dcrwClient = dcrwallet.NewClient(dcrwallet.RawRequestCaller(rpcClient), chaincfg.TestNet3Params())
