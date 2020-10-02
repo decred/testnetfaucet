@@ -1,10 +1,11 @@
-// Copyright (c) 2017-2019 The Decred developers
+// Copyright (c) 2017-2020 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,8 +20,10 @@ import (
 
 	"net"
 
-	"github.com/decred/dcrd/dcrutil/v2"
-	"github.com/decred/dcrd/rpcclient/v5"
+	"decred.org/dcrwallet/rpc/client/dcrwallet"
+	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/dcrutil/v3"
+	"github.com/decred/dcrd/rpcclient/v6"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
@@ -30,7 +33,7 @@ var (
 	cfg *config
 
 	// Daemon Params to use
-	dcrwClient *rpcclient.Client
+	dcrwClient *dcrwallet.Client
 
 	amountMtx        sync.RWMutex
 	lastBalance      dcrutil.Amount
@@ -80,7 +83,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 	amountInput := r.FormValue("amount")
 	overridetokenInput := r.FormValue("overridetoken")
 
-	resp, err := pay(hostIP, addressInput, amountInput, overridetokenInput)
+	resp, err := pay(r.Context(), hostIP, addressInput, amountInput, overridetokenInput)
 	if err != nil {
 		sendReply(w, r, "", err.Error())
 		return
@@ -92,7 +95,7 @@ func requestFunds(w http.ResponseWriter, r *http.Request) {
 // return an error if parameters are invalid or if the client has exceeded the
 // rate limit. Note: requestMtx is used to ensure only one pay function can run
 // at a time.
-func pay(hostIP, addressInput, amountInput, overridetokenInput string) (string, error) {
+func pay(ctx context.Context, hostIP, addressInput, amountInput, overridetokenInput string) (string, error) {
 	// Ensure only one pay function request can run at a time.
 	requestMtx.Lock()
 	defer requestMtx.Unlock()
@@ -153,7 +156,7 @@ func pay(hostIP, addressInput, amountInput, overridetokenInput string) (string, 
 		return "", err
 	}
 
-	resp, err := dcrwClient.SendFromMinConf(cfg.WalletAccount, address, amount, 0)
+	resp, err := dcrwClient.SendFromMinConf(ctx, cfg.WalletAccount, address, amount, 0)
 	if err != nil {
 		log.Errorf("error sending %v to %v for %v: %v",
 			amount, address, hostIP, err)
@@ -203,11 +206,11 @@ func main() {
 
 	dcrwCerts, err := ioutil.ReadFile(cfg.WalletCert)
 	if err != nil {
-		log.Errorf("Failed to read dcrd cert file at %s: %s", cfg.WalletCert,
+		log.Errorf("Failed to read dcrwallet cert file at %s: %s", cfg.WalletCert,
 			err.Error())
 		os.Exit(1)
 	}
-	log.Infof("Attempting to connect to dcrd RPC %s as user %s "+
+	log.Infof("Attempting to connect to dcrwallet RPC %s as user %s "+
 		"using certificate located in %s",
 		cfg.WalletHost, cfg.WalletUser, cfg.WalletCert)
 	connCfgDaemon := &rpcclient.ConnConfig{
@@ -218,17 +221,18 @@ func main() {
 		Certificates: dcrwCerts,
 		DisableTLS:   false,
 	}
-	dcrwClient, err = rpcclient.New(connCfgDaemon, nil)
+	rpcClient, err := rpcclient.New(connCfgDaemon, nil)
 	if err != nil {
-		log.Errorf("Failed to start dcrd rpcclient: %s", err.Error())
+		log.Errorf("Failed to start dcrwallet rpcclient: %s", err.Error())
 		os.Exit(1)
 	}
+	dcrwClient = dcrwallet.NewClient(dcrwallet.RawRequestCaller(rpcClient), chaincfg.TestNet3Params())
 	updateBalance(dcrwClient)
 
 	go func() {
 		<-quit
 		log.Info("Closing testnetfaucet.")
-		dcrwClient.Disconnect()
+		rpcClient.Disconnect()
 		os.Exit(1)
 	}()
 
@@ -322,9 +326,9 @@ func getClientIP(r *http.Request) (string, error) {
 	return xRealIP, nil
 }
 
-func updateBalance(c *rpcclient.Client) {
+func updateBalance(c *dcrwallet.Client) {
 	// calculate balance
-	gbr, err := c.GetBalanceMinConf(cfg.WalletAccount, 0)
+	gbr, err := c.GetBalanceMinConf(context.TODO(), cfg.WalletAccount, 0)
 	if err != nil {
 		log.Warnf("unable to update balance: %v", err)
 		return
