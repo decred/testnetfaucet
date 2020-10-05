@@ -167,7 +167,7 @@ func pay(ctx context.Context, hostIP, addressInput, amountInput, overridetokenIn
 	requestIPs[hostIP] = time.Now()
 	log.Infof("successfully sent %v to %v for %v",
 		amount, address, hostIP)
-	updateBalance(ctx, dcrwClient)
+	updateBalance(dcrwClient)
 
 	return resp.String(), nil
 }
@@ -227,7 +227,7 @@ func main() {
 		os.Exit(1)
 	}
 	dcrwClient = dcrwallet.NewClient(dcrwallet.RawRequestCaller(rpcClient), chaincfg.TestNet3Params())
-	updateBalance(context.Background(), dcrwClient)
+	updateBalance(dcrwClient)
 
 	go func() {
 		<-quit
@@ -326,9 +326,11 @@ func getClientIP(r *http.Request) (string, error) {
 	return xRealIP, nil
 }
 
-func updateBalance(ctx context.Context, c *dcrwallet.Client) {
-	// calculate balance
-	gbr, err := c.GetBalanceMinConf(ctx, cfg.WalletAccount, 0)
+func updateBalance(c *dcrwallet.Client) {
+	// Use background context here, rather than a request context, because
+	// updateBalance should always succeed after a payout, even if the request
+	// context has been closed (eg. because client has closed their connection).
+	gbr, err := c.GetBalanceMinConf(context.Background(), cfg.WalletAccount, 0)
 	if err != nil {
 		log.Warnf("unable to update balance: %v", err)
 		return
