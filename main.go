@@ -167,7 +167,7 @@ func pay(ctx context.Context, hostIP, addressInput, amountInput, overridetokenIn
 	requestIPs[hostIP] = time.Now()
 	log.Infof("successfully sent %v to %v for %v",
 		amount, address, hostIP)
-	updateBalance(dcrwClient)
+	updateBalance(ctx, dcrwClient)
 
 	return resp.String(), nil
 }
@@ -227,7 +227,7 @@ func main() {
 		os.Exit(1)
 	}
 	dcrwClient = dcrwallet.NewClient(dcrwallet.RawRequestCaller(rpcClient), chaincfg.TestNet3Params())
-	updateBalance(dcrwClient)
+	updateBalance(context.Background(), dcrwClient)
 
 	go func() {
 		<-quit
@@ -326,9 +326,9 @@ func getClientIP(r *http.Request) (string, error) {
 	return xRealIP, nil
 }
 
-func updateBalance(c *dcrwallet.Client) {
+func updateBalance(ctx context.Context, c *dcrwallet.Client) {
 	// calculate balance
-	gbr, err := c.GetBalanceMinConf(context.TODO(), cfg.WalletAccount, 0)
+	gbr, err := c.GetBalanceMinConf(ctx, cfg.WalletAccount, 0)
 	if err != nil {
 		log.Warnf("unable to update balance: %v", err)
 		return
