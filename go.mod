@@ -6,7 +6,7 @@ require (
 	decred.org/dcrwallet v1.2.3-0.20201001135929-a600939cc7e5
 	github.com/decred/dcrd/chaincfg/v3 v3.0.0
 	github.com/decred/dcrd/dcrutil/v3 v3.0.0
-	github.com/decred/dcrd/rpcclient/v6 v6.0.0-20201001214221-bf7072fb6583
+	github.com/decred/dcrd/rpcclient/v6 v6.0.0
 	github.com/decred/dcrd/wire v1.4.0
 	github.com/decred/slog v1.1.0
 	github.com/gorilla/handlers v1.5.1
