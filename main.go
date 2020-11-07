@@ -227,8 +227,21 @@ func main() {
 		os.Exit(1)
 	}
 	dcrwClient = dcrwallet.NewClient(dcrwallet.RawRequestCaller(rpcClient), chaincfg.TestNet3Params())
-	updateBalance(dcrwClient)
 
+	go func() {
+		timer := time.NewTicker(5 * time.Minute)
+		defer timer.Stop()
+
+		updateBalance(dcrwClient)
+		for {
+			select {
+			case <-quit:
+				return
+			case <-timer.C:
+				updateBalance(dcrwClient)
+			}
+		}
+	}()
 	go func() {
 		<-quit
 		log.Info("Closing testnetfaucet.")
