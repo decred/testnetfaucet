@@ -327,8 +327,10 @@ func getClientIP(r *http.Request) (string, error) {
 }
 
 func updateBalance(c *dcrwallet.Client) {
-	// calculate balance
-	gbr, err := c.GetBalanceMinConf(context.TODO(), cfg.WalletAccount, 0)
+	// Use background context here, rather than a request context, because
+	// updateBalance should always succeed after a payout, even if the request
+	// context has been closed (eg. because client has closed their connection).
+	gbr, err := c.GetBalanceMinConf(context.Background(), cfg.WalletAccount, 0)
 	if err != nil {
 		log.Warnf("unable to update balance: %v", err)
 		return
