@@ -20,10 +20,10 @@ import (
 
 	"net"
 
-	"decred.org/dcrwallet/rpc/client/dcrwallet"
+	"decred.org/dcrwallet/v2/rpc/client/dcrwallet"
 	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v3"
-	"github.com/decred/dcrd/rpcclient/v6"
+	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/decred/dcrd/rpcclient/v7"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
