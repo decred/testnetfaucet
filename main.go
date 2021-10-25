@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -204,7 +203,7 @@ func main() {
 	requestAmounts = make(map[time.Time]dcrutil.Amount)
 	requestIPs = make(map[string]time.Time)
 
-	dcrwCerts, err := ioutil.ReadFile(cfg.WalletCert)
+	dcrwCerts, err := os.ReadFile(cfg.WalletCert)
 	if err != nil {
 		log.Errorf("Failed to read dcrwallet cert file at %s: %s", cfg.WalletCert,
 			err.Error())
