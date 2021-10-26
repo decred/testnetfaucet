@@ -1,6 +1,6 @@
 module github.com/decred/testnetfaucet
 
-go 1.13
+go 1.16
 
 require (
 	decred.org/dcrwallet v1.6.0-rc2
