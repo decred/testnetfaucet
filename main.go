@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2020 The Decred developers
+// Copyright (c) 2017-2023 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -19,10 +19,11 @@ import (
 
 	"net"
 
-	"decred.org/dcrwallet/rpc/client/dcrwallet"
+	"decred.org/dcrwallet/v3/rpc/client/dcrwallet"
 	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v3"
-	"github.com/decred/dcrd/rpcclient/v6"
+	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/decred/dcrd/rpcclient/v8"
+	"github.com/decred/dcrd/txscript/v4/stdaddr"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
@@ -149,7 +150,7 @@ func pay(ctx context.Context, hostIP, addressInput, amountInput, overridetokenIn
 	}
 
 	// Decode address and amount and send transaction.
-	address, err := dcrutil.DecodeAddress(addressInput, activeNetParams.Params)
+	address, err := stdaddr.DecodeAddress(addressInput, activeNetParams.Params)
 	if err != nil {
 		log.Errorf("ip %v submitted bad address %v", hostIP, addressInput)
 		return "", err
