@@ -281,7 +281,12 @@ func sendReply(w http.ResponseWriter, r *http.Request, successMsg string, errMsg
 		Error: errMsg,
 		TxID:  successMsg,
 	}
-	json, _ := json.Marshal(jsonResp)
+	json, err := json.Marshal(jsonResp)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Errorf("failed to marshal reply: %v", err)
+		return
+	}
 
 	// Return only raw JSON, if specified.
 	if r.FormValue("json") != "" {
